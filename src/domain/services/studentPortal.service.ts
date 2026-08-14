@@ -16,6 +16,9 @@ import {
 } from '../usecases/studentPortal.usecases';
 import { ExamType, HighSchoolTrack } from '../types/education.types';
 import { StudentGoalSetting } from '../types/studentPortal.types';
+import { qaraytiEventBus, QaraytiEventType } from '../../core/integration/event-bus';
+import { learningEvidenceEngine } from '../../core/analytics/learning-evidence-engine';
+import { authService } from '../../core/auth/auth.service';
 
 export class StudentPortalService {
   constructor(
@@ -42,16 +45,33 @@ export class StudentPortalService {
     return this.getLessonsUseCase.getLessonById(lessonId);
   }
 
-  public async completeLesson(studentId: string, lessonId: string) {
-    return this.getLessonsUseCase.completeLesson(studentId, lessonId);
+  public async completeLesson(studentId: string, lessonId: string, completionId?: string) {
+    const res = await this.getLessonsUseCase.completeLesson(studentId, lessonId);
+    const activeCompletionId = completionId || `comp_${studentId}_${lessonId}`;
+    qaraytiEventBus.publish(QaraytiEventType.STUDENT_LESSON_FINISHED, studentId, 'STUDENT', {
+      lessonId,
+      completionId: activeCompletionId,
+      studentId,
+    });
+    return res;
   }
 
   public async getExercises(subjectId?: string, topic?: string) {
     return this.practiceExerciseUseCase.getExercises(subjectId, topic);
   }
 
-  public async submitExerciseAnswer(exerciseId: string, answer: string) {
-    return this.practiceExerciseUseCase.submitAnswer(exerciseId, answer);
+  public async submitExerciseAnswer(exerciseId: string, answer: string, studentId?: string, submissionId?: string) {
+    const res = await this.practiceExerciseUseCase.submitAnswer(exerciseId, answer);
+    const activeStudentId = studentId || authService.getCurrentUser()?.id || 'student-anonymous';
+    const activeSubmissionId = submissionId || `sub_${activeStudentId}_${exerciseId}_${answer}`;
+    qaraytiEventBus.publish(QaraytiEventType.STUDENT_EXERCISE_COMPLETED, activeStudentId, 'STUDENT', {
+      exerciseId,
+      answer,
+      isCorrect: res.isCorrect,
+      studentId: activeStudentId,
+      submissionId: activeSubmissionId,
+    });
+    return res;
   }
 
   public async generateAiExercise(subjectName: string, topic: string, difficulty: string) {
@@ -62,8 +82,17 @@ export class StudentPortalService {
     return this.homeworkUseCase.getHomework(studentId);
   }
 
-  public async submitHomework(homeworkId: string, text: string) {
-    return this.homeworkUseCase.submitHomework(homeworkId, text);
+  public async submitHomework(homeworkId: string, text: string, studentId?: string) {
+    const res = await this.homeworkUseCase.submitHomework(homeworkId, text);
+    const activeStudentId = studentId || authService.getCurrentUser()?.id || 'student-anonymous';
+    qaraytiEventBus.publish(QaraytiEventType.STUDENT_HOMEWORK_SUBMITTED, activeStudentId, 'STUDENT', {
+      homeworkId,
+      studentName: authService.getCurrentUser()?.fullName || 'Qarayti Student',
+      subjectName: 'Mathématiques - BAC 2',
+      text,
+      studentId: activeStudentId,
+    });
+    return res;
   }
 
   public async getExamPrepItems(examType?: ExamType) {
@@ -120,5 +149,9 @@ export class StudentPortalService {
 
   public async getAnalytics(studentId: string) {
     return this.analyticsUseCase.getAnalytics(studentId);
+  }
+
+  public async getLearningEvidence(studentId: string) {
+    return learningEvidenceEngine.getStudentEvidence(studentId);
   }
 }

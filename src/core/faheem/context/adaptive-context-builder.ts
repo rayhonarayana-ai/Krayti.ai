@@ -7,22 +7,41 @@ import { FaheemAdaptiveState } from '../../../domain/types/faheem.types';
 
 export class AdaptiveContextBuilder {
   private state: FaheemAdaptiveState = {
-    currentMasteryLevel: 0.78,
-    bktProbability: 0.82,
-    recommendedDifficulty: 'HARD',
-    spacedRepetitionDueCount: 4,
-    weakTopics: ['Nombres Complexes - Forme Exponentielle', 'Ondes Lumineuses'],
+    evidenceState: 'NO_EVIDENCE',
+    sampleSize: 0,
+    currentMasteryLevel: null,
+    bktProbability: null,
+    recommendedDifficulty: 'MEDIUM',
+    spacedRepetitionDueCount: 0,
+    weakTopics: [],
   };
 
-  public setIRTState(mastery: number, difficulty: 'EASY' | 'MEDIUM' | 'HARD' | 'OLYMPIAD'): this {
-    this.state.currentMasteryLevel = mastery;
-    this.state.recommendedDifficulty = difficulty;
+  public setEvidenceState(evidenceState: 'NO_EVIDENCE' | 'INSUFFICIENT_EVIDENCE' | 'OBSERVED', sampleSize: number = 0): this {
+    this.state.evidenceState = evidenceState;
+    this.state.sampleSize = sampleSize;
+    if (evidenceState === 'NO_EVIDENCE') {
+      this.state.currentMasteryLevel = null;
+      this.state.bktProbability = null;
+      this.state.weakTopics = [];
+    }
     return this;
   }
 
-  public setBKTHistory(bktProbability: number, weakTopics: string[]): this {
+  public setIRTState(mastery: number | null, difficulty: 'EASY' | 'MEDIUM' | 'HARD' | 'OLYMPIAD'): this {
+    this.state.currentMasteryLevel = mastery;
+    this.state.recommendedDifficulty = difficulty;
+    if (mastery !== null) {
+      this.state.evidenceState = 'OBSERVED';
+    }
+    return this;
+  }
+
+  public setBKTHistory(bktProbability: number | null, weakTopics: string[]): this {
     this.state.bktProbability = bktProbability;
     this.state.weakTopics = weakTopics;
+    if (bktProbability !== null) {
+      this.state.evidenceState = 'OBSERVED';
+    }
     return this;
   }
 

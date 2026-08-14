@@ -1,0 +1,112 @@
+{
+  "project": "QARAYTI.AI",
+  "phase": "PHASE_02",
+  "sprint": "SPRINT_2",
+  "title": "Production Auth Runtime Session Propagation & Persistence Closure",
+  "status": "VERIFIED",
+  "closureState": "CLOSED",
+  "closureDate": "2026-08-08",
+  "objective": "Verify real Supabase authentication session propagation across AuthService, ApiClient, and SupabaseLongTermMemoryRepository with full RLS compliance and persistence.",
+  "originalBlocker": "Production AuthService was failing to maintain and propagate real Supabase auth sessions to repositories during runtime.",
+  "blockerResolution": "Synchronized AuthService session state via singleton Supabase client onAuthStateChange listener and getSession recovery.",
+  "authentication": {
+    "method": "signInWithPassword",
+    "email": "auditor.qarayti@gmail.com",
+    "status": "SUCCESS",
+    "httpStatus": 200
+  },
+  "historicalIdentity": {
+    "userId": "15572552-7d31-4084-8850-6dc042dcbe4c",
+    "note": "Historical reference user ID prior to real account confirmation."
+  },
+  "currentVerifiedIdentity": {
+    "userId": "8ea115ff-8e91-4929-aea9-fa4d947d2b22",
+    "email": "auditor.qarayti@gmail.com",
+    "jwtSub": "8ea115ff-8e91-4929-aea9-fa4d947d2b22"
+  },
+  "productionRuntimePath": {
+    "verified": true,
+    "path": "Supabase Client Singleton -> AuthService -> SupabaseLongTermMemoryRepository -> Supabase REST -> RLS -> PostgreSQL"
+  },
+  "authService": {
+    "sessionPresent": true,
+    "userId": "8ea115ff-8e91-4929-aea9-fa4d947d2b22",
+    "accessTokenPresent": true,
+    "refreshTokenPresent": true
+  },
+  "supabaseClient": {
+    "url": "https://aeubxjknpmsrsopcatyd.supabase.co",
+    "singleton": true
+  },
+  "apiClient": {
+    "authenticatedHeaders": true,
+    "singletonClientUsage": true
+  },
+  "repository": {
+    "name": "SupabaseLongTermMemoryRepository",
+    "httpStatus": 200,
+    "operation": "updateConceptMastery",
+    "concept": "MATH-TEST",
+    "score": 0.7
+  },
+  "rls": {
+    "verified": true,
+    "match": "JWT.sub === auth.uid() === learner_memory.user_id",
+    "userId": "8ea115ff-8e91-4929-aea9-fa4d947d2b22"
+  },
+  "persistence": {
+    "beforeReload": {
+      "MATH-TEST": 0.7
+    },
+    "afterReload": {
+      "MATH-TEST": 0.7
+    },
+    "verified": true
+  },
+  "runtimeEvidence": {
+    "login": "SUCCESS",
+    "httpStatus": 200,
+    "userId": "8ea115ff-8e91-4929-aea9-fa4d947d2b22",
+    "jwtSub": "8ea115ff-8e91-4929-aea9-fa4d947d2b22",
+    "persistenceConfirmed": true
+  },
+  "modifiedFiles": [
+    {
+      "path": "src/core/auth/auth.service.ts",
+      "reason": "Handled Supabase session propagation and listener synchronization."
+    },
+    {
+      "path": "src/core/http/api-client.ts",
+      "reason": "Ensured singleton Supabase client usage for authenticated API headers."
+    },
+    {
+      "path": "src/presentation/components/LoginModal.tsx",
+      "reason": "Added UI authentication panel component."
+    },
+    {
+      "path": "src/presentation/components/Header.tsx",
+      "reason": "Integrated auth button and session status indicator."
+    },
+    {
+      "path": "src/App.tsx",
+      "reason": "Mounted LoginModal into root app structure."
+    }
+  ],
+  "securityConstraints": [
+    "No service-role bypass used",
+    "No fake JWT used",
+    "No mock authentication used",
+    "No zero UUID used"
+  ],
+  "verificationChain": [
+    "Real Supabase Auth -> 200 OK",
+    "Session Recovery -> User ID 8ea115ff-8e91-4929-aea9-fa4d947d2b22",
+    "AuthService Propagation -> Active Session",
+    "Production Repository Direct Write -> MATH-TEST: 0.7",
+    "RLS Evaluation -> auth.uid() == user_id",
+    "Application Reload -> Persistent Read Match"
+  ],
+  "remainingBlockers": [],
+  "nextPhase": "PHASE_03",
+  "closureDecision": "CLOSED"
+}

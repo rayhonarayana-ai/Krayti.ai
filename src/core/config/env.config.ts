@@ -42,51 +42,55 @@ class ConfigManager {
   public load(): AppConfig {
     if (this.isLoaded) return this.config;
 
-    const env = (import.meta as unknown as { env: Record<string, string> }).env || {};
+    const importMetaEnv = (import.meta as unknown as { env: Record<string, string> })?.env || {};
 
-    const rawSupabaseUrl = (env.VITE_SUPABASE_URL || '').trim();
-    const rawSupabaseAnonKey = (env.VITE_SUPABASE_ANON_KEY || '').trim();
-    const geminiKey = env.GEMINI_API_KEY || '';
+    const rawSupabaseUrl = (
+      (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) ||
+      importMetaEnv.VITE_SUPABASE_URL ||
+      ''
+    ).trim();
+
+    const rawSupabaseAnonKey = (
+      (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_ANON_KEY) ||
+      importMetaEnv.VITE_SUPABASE_ANON_KEY ||
+      ''
+    ).trim();
+
+    const geminiKey = (
+      (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) ||
+      importMetaEnv.GEMINI_API_KEY ||
+      ''
+    ).trim();
 
     const sanitizeUrl = (urlStr: string): string => {
-      if (!urlStr) return 'https://placeholder-project.supabase.co';
+      if (!urlStr || urlStr.includes('placeholder') || urlStr.includes('your-project')) return '';
       try {
-        const parsed = new URL(urlStr);
+        const parsed = new URL(urlStr.startsWith('http://') || urlStr.startsWith('https://') ? urlStr : `https://${urlStr}`);
         if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-          return urlStr;
+          return parsed.href;
         }
       } catch {
-        // Retry adding https:// if missing protocol
-        try {
-          const withHttps = `https://${urlStr}`;
-          const parsed = new URL(withHttps);
-          if (parsed.protocol === 'https:') {
-            return withHttps;
-          }
-        } catch {
-          // invalid URL
-        }
+        // invalid URL
       }
-      return 'https://placeholder-project.supabase.co';
+      return '';
     };
 
     const supabaseUrl = sanitizeUrl(rawSupabaseUrl);
-    const supabaseAnonKey = rawSupabaseAnonKey || 'placeholder-anon-key';
+    const supabaseAnonKey = (rawSupabaseAnonKey && !rawSupabaseAnonKey.includes('placeholder') && rawSupabaseAnonKey !== 'your-anon-key') ? rawSupabaseAnonKey : '';
 
-    const isSupabaseConfigured = Boolean(
-      rawSupabaseUrl &&
-      rawSupabaseAnonKey &&
-      !supabaseUrl.includes('placeholder') &&
-      !supabaseUrl.includes('your-project') &&
-      rawSupabaseAnonKey !== 'your-anon-key'
-    );
+    const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+
+    const appEnv = (typeof process !== 'undefined' && process.env?.VITE_APP_ENV) || importMetaEnv.VITE_APP_ENV || 'production';
+    const logLevel = (typeof process !== 'undefined' && process.env?.VITE_LOG_LEVEL) || importMetaEnv.VITE_LOG_LEVEL || 'debug';
+    const enableDiagnostics = (typeof process !== 'undefined' && process.env?.VITE_ENABLE_DIAGNOSTICS) || importMetaEnv.VITE_ENABLE_DIAGNOSTICS || 'true';
+    const jwtSecret = (typeof process !== 'undefined' && process.env?.VITE_JWT_SECRET) || importMetaEnv.VITE_JWT_SECRET || 'qarayti-production-jwt-foundation-secret-key';
 
     this.config = {
       appName: 'Qarayti.ai',
       appVersion: '1.0.0-foundation',
-      environment: (env.VITE_APP_ENV as AppConfig['environment']) || 'production',
-      logLevel: (env.VITE_LOG_LEVEL as AppConfig['logLevel']) || 'debug',
-      enableDiagnostics: env.VITE_ENABLE_DIAGNOSTICS !== 'false',
+      environment: appEnv as AppConfig['environment'],
+      logLevel: logLevel as AppConfig['logLevel'],
+      enableDiagnostics: enableDiagnostics !== 'false',
 
       supabase: {
         url: supabaseUrl,
@@ -100,7 +104,7 @@ class ConfigManager {
       },
 
       auth: {
-        jwtSecret: env.VITE_JWT_SECRET || 'qarayti-production-jwt-foundation-secret-key',
+        jwtSecret: jwtSecret,
         tokenExpirySeconds: 3600, // 1 hour
         refreshTokenExpiryDays: 30,
       },

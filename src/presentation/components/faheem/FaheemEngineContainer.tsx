@@ -142,74 +142,74 @@ export const FaheemEngineContainer: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Banner & Header */}
-      <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 rounded-xl p-6 text-white shadow-xl border border-emerald-700/50">
+      <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 rounded-xl p-6 text-white shadow-xl border border-emerald-700/50" dir="rtl">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-4">
             <div className="p-3 bg-emerald-500/20 rounded-xl border border-emerald-400/30">
               <BrainCircuit className="w-9 h-9 text-emerald-300" />
             </div>
             <div>
-              <div className="flex items-center space-x-2">
-                <h1 className="text-2xl font-bold tracking-tight">Faheem AI Engine (نظام فهيم الذكي)</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold tracking-tight">محرك فهيم الذكي (Faheem AI Engine)</h1>
                 <span className="px-2.5 py-0.5 text-xs font-semibold bg-emerald-500/30 text-emerald-200 border border-emerald-400/30 rounded-full">
-                  Production v1.0
+                  النسخة السيادية v1.0
                 </span>
               </div>
               <p className="text-emerald-100/80 text-sm mt-1">
-                Official AI Orchestrator for the Moroccan Educational System (وزارة التربية الوطنية) • Gemini 3.6 Flash Powered
+                الموجه الذكي لمنظومة التربية الوطنية المغربية • مدعوم بـ Gemini 3.6 Flash
               </p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center gap-3">
             <button
               onClick={handleStartSession}
               disabled={isLoading}
-              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold rounded-lg text-sm transition shadow-lg flex items-center space-x-2 disabled:opacity-50"
+              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-lg text-sm transition shadow-lg flex items-center gap-2 disabled:opacity-50"
             >
               <Sparkles className="w-4 h-4" />
-              <span>{activeSession ? 'Re-Initialize Session' : 'Start AI Session'}</span>
+              <span>{activeSession ? 'إعادة تهيئة الجلسة' : 'بدء جلسة الذكاء الاصطناعي'}</span>
             </button>
           </div>
         </div>
       </div>
 
       {/* Metrics & Telemetry Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4" dir="rtl">
         <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
           <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>Total Queries</span>
+            <span>إجمالي الاستعلامات</span>
             <Cpu className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="text-2xl font-bold text-white mt-1">{metrics?.totalQueries ?? 0}</div>
-          <div className="text-[11px] text-slate-500 mt-1">Real-time throughput</div>
+          <div className="text-[11px] text-slate-500 mt-1">إنتاجية فورية</div>
         </div>
 
         <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
           <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>Avg Latency</span>
+            <span>متوسط الاستجابة</span>
             <Clock className="w-4 h-4 text-teal-400" />
           </div>
           <div className="text-2xl font-bold text-white mt-1">{metrics?.avgLatencyMs ?? 0} ms</div>
-          <div className="text-[11px] text-slate-500 mt-1">Pipeline execution speed</div>
+          <div className="text-[11px] text-slate-500 mt-1">سرعة معالجة المحرك</div>
         </div>
 
         <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
           <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>Input Tokens</span>
+            <span>رموز الإدخال (Tokens)</span>
             <Layers className="w-4 h-4 text-blue-400" />
           </div>
           <div className="text-2xl font-bold text-white mt-1">{metrics?.totalInputTokens ?? 0}</div>
-          <div className="text-[11px] text-slate-500 mt-1">Prompt & context tokens</div>
+          <div className="text-[11px] text-slate-500 mt-1">رموز السياق والمدخلات</div>
         </div>
 
         <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
           <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>Output Tokens</span>
+            <span>رموز المخرجات</span>
             <Terminal className="w-4 h-4 text-indigo-400" />
           </div>
           <div className="text-2xl font-bold text-white mt-1">{metrics?.totalOutputTokens ?? 0}</div>
-          <div className="text-[11px] text-slate-500 mt-1">Generated completion tokens</div>
+          <div className="text-[11px] text-slate-500 mt-1">رموز الإجابة المولدة</div>
         </div>
 
         <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">

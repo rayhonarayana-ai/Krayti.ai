@@ -7,7 +7,7 @@ import { UserRole, UserProfile, AuthSession, ResourceDomain, PermissionAction } 
 import { EducationLevel, HighSchoolTrack, EducationLanguage } from '../../domain/types/education.types';
 import { rbacManager } from './rbac.manager';
 import { logger } from '../logging/logger';
-import { UnauthorizedError } from '../errors/app-error';
+import { supabase } from '../../infrastructure/supabase/client';
 
 export interface IAuthService {
   getCurrentSession(): AuthSession | null;
@@ -18,6 +18,9 @@ export interface IAuthService {
   setFoundationSession(role: UserRole): AuthSession;
   clearSession(): void;
   subscribe(listener: (session: AuthSession | null) => void): () => void;
+  signUp(email: string, password: string): Promise<AuthSession | null>;
+  signInWithPassword(email: string, password: string): Promise<AuthSession | null>;
+  signOut(): Promise<void>;
 }
 
 export class AuthService implements IAuthService {
@@ -25,8 +28,72 @@ export class AuthService implements IAuthService {
   private listeners: Set<(session: AuthSession | null) => void> = new Set();
 
   constructor() {
-    // Default foundation user (Student role initialized for foundation verification)
-    this.setFoundationSession(UserRole.STUDENT);
+    // 1. Recover existing Supabase session upon startup
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      this.updateSessionFromSupabase(session);
+    }).catch((err) => {
+      logger.error('AuthService', 'Failed to recover Supabase session:', err);
+      this.updateSessionFromSupabase(null);
+    });
+
+    // 2. Register real Supabase auth state listener
+    supabase.auth.onAuthStateChange((_event, session) => {
+      this.updateSessionFromSupabase(session);
+    });
+  }
+
+  private updateSessionFromSupabase(session: any): void {
+    if (!session || !session.user) {
+      this.currentSession = null;
+    } else {
+      const user = session.user;
+      const userProfile: UserProfile = {
+        id: user.id,
+        email: user.email || '',
+        fullName: user.user_metadata?.full_name || user.email || 'Qarayti User',
+        role: (user.user_metadata?.role as UserRole) || UserRole.STUDENT,
+        preferredLanguage: EducationLanguage.ARABIC,
+        educationLevel: EducationLevel.HIGH_SCHOOL,
+        track: HighSchoolTrack.MATHEMATICS_A,
+        academicYear: '2025/2026',
+        isVerified: true,
+        isActive: true,
+        createdAt: new Date(user.created_at || Date.now()),
+        updatedAt: new Date(),
+      };
+
+      this.currentSession = {
+        accessToken: session.access_token,
+        refreshToken: session.refresh_token || '',
+        expiresAt: session.expires_at || Math.floor(Date.now() / 1000) + 3600,
+        user: userProfile,
+      };
+    }
+    logger.info('AuthService', `Supabase session updated for user: ${this.currentSession?.user.id || 'Anonymous'}`);
+    this.notifyListeners();
+  }
+
+  public async signUp(email: string, password: string): Promise<AuthSession | null> {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
+    if (data.session) {
+      this.updateSessionFromSupabase(data.session);
+    }
+    return this.currentSession;
+  }
+
+  public async signInWithPassword(email: string, password: string): Promise<AuthSession | null> {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    if (data.session) {
+      this.updateSessionFromSupabase(data.session);
+    }
+    return this.currentSession;
+  }
+
+  public async signOut(): Promise<void> {
+    await supabase.auth.signOut();
+    this.clearSession();
   }
 
   public getCurrentSession(): AuthSession | null {

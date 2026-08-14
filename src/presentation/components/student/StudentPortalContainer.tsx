@@ -23,6 +23,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { container } from '../../../core/di/container';
+import { authService } from '../../../core/auth/auth.service';
 import { StudentPortalService } from '../../../domain/services/studentPortal.service';
 import {
   StudentDashboardSummary,

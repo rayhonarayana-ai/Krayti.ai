@@ -21,6 +21,8 @@ import { errorTracker } from '../errors/error-tracker';
 import { scaleOptimizer } from '../performance/scale-optimizer';
 import { registerFaheemAiEngine } from '../faheem/faheem-startup';
 import { registerStudentPortalSubsystems } from '../student/student-startup';
+import { registerTeacherPortalSubsystems } from '../teacher/teacher-startup';
+import { registerCoreIntegrationSubsystems } from '../integration/integration-startup';
 
 export interface SubsystemHealth {
   name: string;
@@ -91,6 +93,12 @@ export class StartupSequence {
 
       // Register Student Portal Subsystems
       registerStudentPortalSubsystems();
+
+      // Register Teacher Portal Subsystems
+      registerTeacherPortalSubsystems();
+
+      // Register Core Integration Engine & Workflow Subsystems
+      registerCoreIntegrationSubsystems();
 
       subsystems.push({
         name: 'Dependency Injection',

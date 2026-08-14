@@ -6,7 +6,7 @@
 import { FaheemSessionManager } from '../session/session-manager';
 import { FaheemConversationManager } from '../session/conversation-manager';
 import { FaheemResponsePipeline } from '../pipeline/response-pipeline';
-import { FaheemTelemetry } from '../monitoring/telemetry-engine';
+import { FaheemTelemetry } from '../monitoring/faheem-telemetry';
 import { FaheemRateLimiter } from '../governance/rate-limiter';
 import { FaheemRetryPolicy } from '../governance/retry-policy';
 import { FaheemValidator } from '../../../domain/validators/faheem.validator';

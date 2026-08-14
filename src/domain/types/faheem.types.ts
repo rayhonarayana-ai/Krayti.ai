@@ -70,8 +70,10 @@ export interface FaheemCurriculumUnit {
 }
 
 export interface FaheemAdaptiveState {
-  currentMasteryLevel: number; // 0.0 to 1.0 (IRT score)
-  bktProbability: number;      // 0.0 to 1.0 (BKT pMastery)
+  evidenceState?: 'NO_EVIDENCE' | 'INSUFFICIENT_EVIDENCE' | 'OBSERVED';
+  sampleSize?: number;
+  currentMasteryLevel: number | null; // 0.0 to 1.0 (IRT score), null if NO_EVIDENCE
+  bktProbability: number | null;      // 0.0 to 1.0 (BKT pMastery), null if NO_EVIDENCE
   recommendedDifficulty: 'EASY' | 'MEDIUM' | 'HARD' | 'OLYMPIAD';
   spacedRepetitionDueCount: number;
   weakTopics: string[];

@@ -93,7 +93,10 @@ export class RecommendationEngine {
     // 3. High BAC Weight Opportunities
     nodes.forEach((node) => {
       const record = masteryMap.get(node.id);
-      const mastery = record ? record.masteryScore : 0.25;
+      if (!record || record.evidenceState !== 'OBSERVED' || record.masteryScore === null) {
+        return;
+      }
+      const mastery = record.masteryScore;
 
       if (
         node.nationalExamWeight >= 20 &&

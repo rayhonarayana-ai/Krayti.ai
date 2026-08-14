@@ -4,6 +4,7 @@
  */
 
 import { logger } from '../../logging/logger';
+import { SupabaseLongTermMemoryRepository } from './supabase-long-term-memory-repository';
 
 export interface UserLearnerMemory {
   userId: string;
@@ -19,6 +20,9 @@ export interface ILongTermMemoryRepository {
   saveNote(userId: string, note: string): Promise<void>;
 }
 
+/**
+ * @deprecated - kept for local dev fallback
+ */
 export class LongTermMemoryRepositoryImpl implements ILongTermMemoryRepository {
   private memoryStore = new Map<string, UserLearnerMemory>();
 
@@ -59,4 +63,4 @@ export class LongTermMemoryRepositoryImpl implements ILongTermMemoryRepository {
   }
 }
 
-export const longTermMemoryRepo = new LongTermMemoryRepositoryImpl();
+export const longTermMemoryRepo = new SupabaseLongTermMemoryRepository();

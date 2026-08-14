@@ -57,16 +57,10 @@ export const AiTutorView: React.FC = () => {
       const faheemService = container.resolve<FaheemService>('FaheemService');
       const response = await faheemService.processQuery({
         sessionId: 'student-session-01',
-        prompt: currentQuery,
-        studentContext: {
-          studentId: 'student-1',
-          name: 'Youssef El Amrani',
-          educationLevel: EducationLevel.HIGH_SCHOOL,
-          track: HighSchoolTrack.MATHEMATICS_A,
-          preferredLanguage: selectedLang,
-          masteryOverview: { 'MATH-06': 0.65 },
-          weaknesses: ['الأعداد العقدية - الشكل الأسّي'],
-        },
+        userId: 'student-1',
+        query: currentQuery,
+        role: 'student',
+        language: selectedLang,
       });
 
       setMessages((prev) => [

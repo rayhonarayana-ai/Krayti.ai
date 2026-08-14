@@ -44,13 +44,15 @@ export interface BKTState {
 
 export interface MasteryRecord {
   nodeId: string;
-  masteryScore: number; // 0.0 to 1.0 (derived from BKT)
+  evidenceState?: 'NO_EVIDENCE' | 'INSUFFICIENT_EVIDENCE' | 'OBSERVED';
+  sampleSize?: number;
+  masteryScore: number | null; // null if NO_EVIDENCE, 0.0 to 1.0 (derived from BKT/evidence) when observed
   confidenceInterval: [number, number]; // [lower, upper]
   stabilityDays: number; // Memory stability in days
   bkt: BKTState;
   attemptsCount: number;
   correctCount: number;
-  lastAttemptDate: string; // ISO date
+  lastAttemptDate: string | null; // ISO date or null
   bloomsDistribution: Record<BloomLevel, number>; // 0 to 1 score per bloom level
 }
 

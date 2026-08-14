@@ -56,6 +56,10 @@ export class TelemetryEngine {
     }
   }
 
+  public recordMetric(metricName: string, value: number, tags?: Record<string, unknown>): void {
+    logger.debug('TelemetryEngine', `Custom Metric Recorded [${metricName}]: ${value}`, tags);
+  }
+
   public getTelemetrySummary() {
     const sorted = [...this.apiLatenciesMs].sort((a, b) => a - b);
     const count = sorted.length;

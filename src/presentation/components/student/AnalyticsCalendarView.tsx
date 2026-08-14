@@ -14,7 +14,8 @@ import {
   Sparkles,
   Zap,
 } from 'lucide-react';
-import { LearningAnalytics, StudentNotification } from '../../../domain/types/studentPortal.types';
+import { StudentNotification } from '../../../domain/types/studentPortal.types';
+import { LearningAnalytics } from '../../../domain/types/adaptive.types';
 
 interface AnalyticsCalendarViewProps {
   analytics: LearningAnalytics;

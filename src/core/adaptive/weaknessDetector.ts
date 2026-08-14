@@ -23,15 +23,26 @@ export class WeaknessDetector {
 
     nodes.forEach((node) => {
       const record = masteryMap.get(node.id);
-      const masteryScore = record ? record.masteryScore : 0.25;
+      
+      // Do NOT flag weakness if node has NO_EVIDENCE or INSUFFICIENT_EVIDENCE (< 2 observations)
+      if (!record || record.evidenceState === 'NO_EVIDENCE' || record.evidenceState === 'INSUFFICIENT_EVIDENCE' || record.masteryScore === null) {
+        return;
+      }
 
-      // Check if node is weak or failing
+      const masteryScore = record.masteryScore;
+
+      // Check if node is weak or failing based on OBSERVED evidence
       if (masteryScore < 0.55) {
         // Trace prerequisites
         const failingPrereqs: string[] = [];
         node.prerequisiteIds.forEach((prereqId) => {
           const prereqRecord = masteryMap.get(prereqId);
-          if (!prereqRecord || prereqRecord.masteryScore < 0.60) {
+          if (
+            prereqRecord &&
+            prereqRecord.evidenceState === 'OBSERVED' &&
+            prereqRecord.masteryScore !== null &&
+            prereqRecord.masteryScore < 0.60
+          ) {
             failingPrereqs.push(prereqId);
           }
         });

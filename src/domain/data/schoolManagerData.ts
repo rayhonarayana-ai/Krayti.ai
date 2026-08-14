@@ -129,7 +129,7 @@ export const INITIAL_SCHOOL_STUDENTS: SchoolStudent[] = [
     className: '2ème BAC Sc. Math A',
     guardianName: 'Mme Meriem Chraibi',
     guardianPhone: '+212 664-920192',
-    academicAverage: 09.5,
+    academicAverage: 9.5,
     tuitionStatus: 'OVERDUE',
     riskLevel: 'HIGH',
     status: 'ACTIVE',

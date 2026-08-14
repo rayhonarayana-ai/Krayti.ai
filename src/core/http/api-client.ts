@@ -3,44 +3,15 @@
  * Resilient HTTP & Edge Function Client with auto-authentication, retry, and trace logging
  */
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { supabase } from '../../infrastructure/supabase/client';
 import { envConfig } from '../config/env.config';
 import { logger } from '../logging/logger';
 import { AppError, DatabaseError, UnauthorizedError } from '../errors/app-error';
 import { ApiResponse } from '../../domain/types/common.types';
 
 export class ApiClient {
-  private supabase: SupabaseClient;
-
-  constructor() {
-    const config = envConfig.get();
-    let url = config.supabase.url;
-    let anonKey = config.supabase.anonKey;
-
-    if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
-      url = 'https://placeholder-project.supabase.co';
-    }
-    if (!anonKey) {
-      anonKey = 'placeholder-anon-key';
-    }
-
-    try {
-      this.supabase = createClient(url, anonKey, {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-        },
-      });
-    } catch (err) {
-      logger.warn('ApiClient', 'Failed to initialize custom Supabase URL, falling back to safe default URL.', err);
-      this.supabase = createClient('https://placeholder-project.supabase.co', 'placeholder-anon-key', {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-        },
-      });
-    }
-  }
+  private supabase: SupabaseClient = supabase;
 
   public getSupabaseClient(): SupabaseClient {
     return this.supabase;

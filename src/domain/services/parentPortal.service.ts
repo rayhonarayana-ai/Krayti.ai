@@ -14,6 +14,7 @@ import {
   WeeklyReportDigest,
   AIRecommendation,
 } from '../types/parentPortal.types';
+import { learningEvidenceEngine } from '../../core/analytics/learning-evidence-engine';
 
 export class ParentPortalService {
   /**
@@ -182,6 +183,10 @@ export class ParentPortalService {
       focusScore: Math.min(100, Math.max(50, Math.round(child.attendanceRate - pendingHw * 4))),
       aiWeeklyInsight: `Dossier de ${child.firstName} : Progression régulière. L'analyse des données de travail personnel montre un engagement élevé. Maintien recommandé du rythme de révision nationale.`,
     };
+  }
+
+  public async getParentIntelligenceSummary(studentId: string) {
+    return learningEvidenceEngine.getParentSummary(studentId);
   }
 }
 

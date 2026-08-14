@@ -16,6 +16,7 @@ import {
   FaheemRoleContext,
 } from '../types/faheem.types';
 import { EducationLanguage } from '../types/education.types';
+import { learningEvidenceEngine } from '../../core/analytics/learning-evidence-engine';
 
 export class FaheemService {
   constructor(
@@ -28,6 +29,10 @@ export class FaheemService {
     return this.processQueryUseCase.execute(dto);
   }
 
+  public async processQuery(dto: ProcessFaheemQueryDTO): Promise<FaheemQueryResponseDTO> {
+    return this.query(dto);
+  }
+
   public async startSession(
     userId: string,
     role: FaheemRoleContext,
@@ -38,5 +43,9 @@ export class FaheemService {
 
   public async getEngineMetrics(): Promise<FaheemMetrics> {
     return this.getMetricsUseCase.execute();
+  }
+
+  public async getStudentEvidenceContext(studentId: string) {
+    return learningEvidenceEngine.getStudentEvidence(studentId);
   }
 }

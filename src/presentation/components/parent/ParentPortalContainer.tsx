@@ -46,49 +46,49 @@ const InnerParentPortalContent: React.FC = () => {
   const { children, activeChildId, setActiveChildId, activeChild } = useParentPortal();
 
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'children', label: 'Enfants & Massar', icon: Users },
-    { id: 'progress', label: 'Bilan Progression', icon: TrendingUp },
-    { id: 'attendance', label: 'Présence & Retards', icon: Clock },
-    { id: 'grades', label: 'Notes & Contrôles', icon: Award },
-    { id: 'homework', label: 'Devoirs & Travaux', icon: BookOpen },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'messaging', label: 'Messagerie Profs', icon: MessageSquare },
-    { id: 'weekly-ai', label: 'Rapport Hebdo IA', icon: BrainCircuit },
-    { id: 'payments', label: 'Scolarité & Paiements', icon: CreditCard },
+    { id: 'dashboard', label: 'لوحة التحكم للوالدين', icon: LayoutDashboard },
+    { id: 'children', label: 'الأبناء ومسار Massar', icon: Users },
+    { id: 'progress', label: 'حصيلة التقدم الدراسي', icon: TrendingUp },
+    { id: 'attendance', label: 'الحضور والتأخرات', icon: Clock },
+    { id: 'grades', label: 'النقاط والفروض', icon: Award },
+    { id: 'homework', label: 'الواجبات المنزلية', icon: BookOpen },
+    { id: 'notifications', label: 'الإشعارات التنبيهية', icon: Bell },
+    { id: 'messaging', label: 'مراسلة الأساتذة', icon: MessageSquare },
+    { id: 'weekly-ai', label: 'التقرير الأسبوعي لفهيم AI', icon: BrainCircuit },
+    { id: 'payments', label: 'مصاريف الواجب المالي', icon: CreditCard },
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir="rtl">
       {/* Top Header Switcher for Active Child & Sub-Module Bar */}
       <div className="bg-[#161920] border border-[#2D333D] p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full border-2 border-[#D4AF37] overflow-hidden bg-[#0F1115]">
             <img src={activeChild.avatarUrl} alt={activeChild.fullName} className="w-full h-full object-cover" />
           </div>
           <div>
-            <div className="flex items-center space-x-2">
-              <span className="text-xs font-mono font-bold text-[#EAE9E6]">{activeChild.fullName}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-[#EAE9E6]">{activeChild.fullName}</span>
               <span className="text-[10px] font-mono text-[#D4AF37] bg-[#D4AF37]/10 px-2 py-0.5 border border-[#D4AF37]/30">
-                Massar: {activeChild.massarCode}
+                رمز مسار: {activeChild.massarCode}
               </span>
             </div>
-            <p className="text-[11px] font-mono text-[#8E9299]">
+            <p className="text-[11px] text-[#8E9299]">
               {activeChild.gradeLevel} • {activeChild.schoolName}
             </p>
           </div>
         </div>
 
         {/* Quick Child Select Buttons */}
-        <div className="flex items-center space-x-2">
-          <span className="text-xs font-mono text-[#8E9299] uppercase hidden sm:inline">Changer d'Enfant:</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-[#8E9299] hidden sm:inline">اختيار التلميذ:</span>
           {children.map((child) => (
             <button
               key={child.id}
               onClick={() => setActiveChildId(child.id)}
-              className={`px-3 py-1.5 text-xs font-mono border transition-all ${
+              className={`px-3 py-1.5 text-xs font-bold border transition-all ${
                 child.id === activeChildId
-                  ? 'bg-[#D4AF37] text-[#0F1115] font-bold border-[#D4AF37]'
+                  ? 'bg-[#D4AF37] text-[#0F1115] border-[#D4AF37]'
                   : 'bg-[#0F1115] text-[#8E9299] border-[#2D333D] hover:text-[#EAE9E6]'
               }`}
             >
@@ -99,7 +99,7 @@ const InnerParentPortalContent: React.FC = () => {
       </div>
 
       {/* Sub-Module Navigation Ribbon */}
-      <div className="bg-[#161920] border border-[#2D333D] p-2 flex items-center space-x-1 overflow-x-auto">
+      <div className="bg-[#161920] border border-[#2D333D] p-2 flex items-center gap-1 overflow-x-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeModule === item.id;
@@ -107,9 +107,9 @@ const InnerParentPortalContent: React.FC = () => {
             <button
               key={item.id}
               onClick={() => setActiveModule(item.id)}
-              className={`flex items-center space-x-2 px-3 py-2 text-xs font-mono whitespace-nowrap uppercase tracking-wider border transition-all ${
+              className={`flex items-center gap-2 px-3 py-2 text-xs font-bold whitespace-nowrap border transition-all ${
                 isActive
-                  ? 'bg-[#D4AF37] text-[#0F1115] font-bold border-[#D4AF37]'
+                  ? 'bg-[#D4AF37] text-[#0F1115] border-[#D4AF37]'
                   : 'bg-transparent text-[#8E9299] border-transparent hover:text-[#EAE9E6] hover:bg-[#0F1115]'
               }`}
             >
