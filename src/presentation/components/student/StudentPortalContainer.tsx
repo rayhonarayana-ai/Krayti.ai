@@ -25,6 +25,7 @@ import {
 import { container } from '../../../core/di/container';
 import { authService } from '../../../core/auth/auth.service';
 import { StudentPortalService } from '../../../domain/services/studentPortal.service';
+import { UserProfile } from '../../../domain/types/auth.types';
 import {
   StudentDashboardSummary,
   StudentLesson,
@@ -61,6 +62,7 @@ import { AnalyticsCalendarView } from './AnalyticsCalendarView';
 export const StudentPortalContainer: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
   // Loaded State
   const [summary, setSummary] = useState<StudentDashboardSummary | null>(null);
@@ -79,9 +81,23 @@ export const StudentPortalContainer: React.FC = () => {
   const [notifications, setNotifications] = useState<StudentNotification[]>([]);
   const [analytics, setAnalytics] = useState<LearningAnalytics | null>(null);
 
-  const studentId = 'student-1';
+  const studentId = currentUser?.id || '';
+
+  // Auth listener
+  useEffect(() => {
+    const user = authService.getCurrentUser();
+    setCurrentUser(user);
+    const unsub = authService.subscribe((session) => {
+      setCurrentUser(session?.user ?? null);
+    });
+    return unsub;
+  }, []);
 
   const loadData = async () => {
+    if (!studentId) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const service = container.resolve<StudentPortalService>('StudentPortalService');

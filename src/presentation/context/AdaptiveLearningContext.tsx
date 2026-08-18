@@ -35,6 +35,7 @@ import { IRTEngine } from '../../core/adaptive/irtEngine';
 import { WeaknessDetector } from '../../core/adaptive/weaknessDetector';
 import { RecommendationEngine } from '../../core/adaptive/recommendationEngine';
 import { DailyPlanGenerator } from '../../core/adaptive/dailyPlanGenerator';
+import { authService } from '../../core/auth/auth.service';
 
 interface AdaptiveLearningContextType {
   activeStudent: StudentProfile;
@@ -62,52 +63,36 @@ interface AdaptiveLearningContextType {
 const AdaptiveLearningContext = createContext<AdaptiveLearningContextType | undefined>(undefined);
 
 export const AdaptiveLearningProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [activeStudentId, setActiveStudentId] = useState<string>('student-1');
+  const [activeStudentId, setActiveStudentId] = useState<string | null>(() => {
+    return authService.getCurrentUser()?.id || null;
+  });
   const [cards, setCards] = useState<SpacedRepetitionCard[]>(SPACED_REPETITION_CARDS);
   const [skillTree, setSkillTree] = useState<SkillTreeNode[]>(SKILL_TREE_NODES);
 
-  // Initialize mastery records map for all nodes
+  // Initialize mastery records map for all nodes — NO_EVIDENCE for new authenticated learners
   const [masteryMap, setMasteryMap] = useState<Map<string, MasteryRecord>>(() => {
     const initialMap = new Map<string, MasteryRecord>();
     KNOWLEDGE_NODES.forEach((node) => {
-      // Custom initial mastery scores for demonstration
-      let pKnown = 0.45;
-      let attempts = 3;
-      let correct = 2;
-
-      if (node.id === 'MATH-01' || node.id === 'PHYS-01') {
-        pKnown = 0.92;
-        attempts = 10;
-        correct = 9;
-      } else if (node.id === 'PHYS-03' || node.id === 'MATH-06') {
-        pKnown = 0.28;
-        attempts = 4;
-        correct = 1;
-      } else if (node.id === 'MATH-03') {
-        pKnown = 0.62;
-        attempts = 6;
-        correct = 4;
-      }
-
+      const pKnown = 0; // NO_EVIDENCE — no seeded mastery for production learners
       const bkt = { ...DEFAULT_BKT_PARAMS, pKnown };
-      const confidence = BKTEngine.calculateConfidenceInterval(pKnown, attempts);
+      const confidence = BKTEngine.calculateConfidenceInterval(pKnown, 0);
 
       initialMap.set(node.id, {
         nodeId: node.id,
         masteryScore: pKnown,
         confidenceInterval: confidence,
-        stabilityDays: Math.round(pKnown * 14) + 1,
+        stabilityDays: 0,
         bkt,
-        attemptsCount: attempts,
-        correctCount: correct,
-        lastAttemptDate: new Date(Date.now() - 86400000 * 2).toISOString(),
+        attemptsCount: 0,
+        correctCount: 0,
+        lastAttemptDate: '',
         bloomsDistribution: {
-          REMEMBER: Math.min(1, pKnown + 0.1),
-          UNDERSTAND: Math.min(1, pKnown),
-          APPLY: Math.max(0.1, pKnown - 0.1),
-          ANALYZE: Math.max(0.05, pKnown - 0.2),
-          EVALUATE: Math.max(0.0, pKnown - 0.3),
-          CREATE: Math.max(0.0, pKnown - 0.4),
+          REMEMBER: 0,
+          UNDERSTAND: 0,
+          APPLY: 0,
+          ANALYZE: 0,
+          EVALUATE: 0,
+          CREATE: 0,
         },
       });
     });
@@ -326,23 +311,23 @@ export const AdaptiveLearningProvider: React.FC<{ children: React.ReactNode }> =
     setSkillTree(SKILL_TREE_NODES);
     const initialMap = new Map<string, MasteryRecord>();
     KNOWLEDGE_NODES.forEach((node) => {
-      const pKnown = 0.45;
+      const pKnown = 0; // NO_EVIDENCE
       initialMap.set(node.id, {
         nodeId: node.id,
         masteryScore: pKnown,
-        confidenceInterval: [0.35, 0.55],
-        stabilityDays: 5,
+        confidenceInterval: [0, 0],
+        stabilityDays: 0,
         bkt: { ...DEFAULT_BKT_PARAMS, pKnown },
-        attemptsCount: 3,
-        correctCount: 2,
-        lastAttemptDate: new Date().toISOString(),
+        attemptsCount: 0,
+        correctCount: 0,
+        lastAttemptDate: '',
         bloomsDistribution: {
-          REMEMBER: 0.6,
-          UNDERSTAND: 0.5,
-          APPLY: 0.4,
-          ANALYZE: 0.2,
-          EVALUATE: 0.1,
-          CREATE: 0.05,
+          REMEMBER: 0,
+          UNDERSTAND: 0,
+          APPLY: 0,
+          ANALYZE: 0,
+          EVALUATE: 0,
+          CREATE: 0,
         },
       });
     });

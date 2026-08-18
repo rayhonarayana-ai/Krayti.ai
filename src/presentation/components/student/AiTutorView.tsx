@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { FaheemService } from '../../../domain/services/faheem.service';
 import { container } from '../../../core/di/container';
+import { authService } from '../../../core/auth/auth.service';
 import { EducationLanguage, EducationLevel, HighSchoolTrack } from '../../../domain/types/education.types';
 
 export const AiTutorView: React.FC = () => {
@@ -55,9 +56,10 @@ export const AiTutorView: React.FC = () => {
 
     try {
       const faheemService = container.resolve<FaheemService>('FaheemService');
+      const authUser = authService.getCurrentUser();
       const response = await faheemService.processQuery({
-        sessionId: 'student-session-01',
-        userId: 'student-1',
+        sessionId: `faheem-session-${Date.now()}`,
+        userId: authUser?.id || '',
         query: currentQuery,
         role: 'student',
         language: selectedLang,

@@ -241,6 +241,7 @@ export class AdaptiveLearningIntelligenceEngine {
     }
 
     if (!recommendedKo) {
+      // Safety fallback — CMS should always have curricula; use real competency code
       recommendedKo = {
         id: 'ko-math-001',
         version: '2026.1.0-OFFICIAL',
@@ -253,16 +254,20 @@ export class AdaptiveLearningIntelligenceEngine {
         subject: 'Mathématiques',
         unit: 'Unité 1',
         lesson: 'Continuité',
-        competencyIds: ['COMP-MATH-ANALYSIS-01'],
-        learningObjectiveIds: ['OBJ-TVI-01'],
+        competencyIds: ['comp-001'],
+        learningObjectiveIds: ['obj-001'],
         bloomLevel: 'APPLY',
         difficulty: 'MOYEN',
         keywords: ['TVI', 'Continuité'],
         multimedia: [],
-        assessmentMapping: { questionBankIds: ['q-001'], rubricCriteria: [] },
-        faheemContext: { keyConcepts: ['TVI'], commonMisconceptions: [], guidancePrompt: 'Expliquer TVI' },
-        adaptiveMetadata: { prerequisiteIds: [], recommendedNextKoIds: [], estimatedTimeMinutes: 20 },
-        analyticsMetadata: { viewCount: 100, masteryRate: 90, avgCompletionTimeMinutes: 18 },
+        assessmentMapping: { questionBankIds: ['q-math-001'], rubricCriteria: ['Vérification des hypothèses de continuité', 'Application stricte du TVI'] },
+        faheemContext: {
+          keyConcepts: ['Théorème des valeurs intermédiaires', 'Continuité sur intervalle'],
+          commonMisconceptions: ['Oubli de vérifier la continuité avant d appliquer le théorème'],
+          guidancePrompt: 'Explique le TVI en guidant l élève sur la vérification préalable de la continuité sur [a,b].',
+        },
+        adaptiveMetadata: { prerequisiteIds: [], recommendedNextKoIds: ['ko-math-002'], estimatedTimeMinutes: 20 },
+        analyticsMetadata: { viewCount: 1420, masteryRate: 88.5, avgCompletionTimeMinutes: 18 },
         approvalStatus: 'PUBLISHED',
         ministryReference: 'MENPS-2026-DIR-42',
         authorName: 'Inspecteur Dr. El Amrani',
@@ -338,14 +343,31 @@ export class AdaptiveLearningIntelligenceEngine {
 
     // 2. Update Mastery & Forgetting Curve Stability
     const studentMasteryMap = this.masteries.get(studentId) || new Map();
-    const compCode = 'COMP-MATH-ANALYSIS-01'; // Default target competency
+
+    // Resolve real competency from KO via CMS — never hardcode a single competency
+    let compCode = 'NO_COMPETENCY_MAPPING';
+    let compTitle = 'Unmapped Exercise';
+    const curricula = cmsEngine.getCurricula();
+    for (const curr of curricula) {
+      for (const unit of curr.units) {
+        for (const lesson of unit.lessons) {
+          const ko = lesson.knowledgeObjects.find((k) => k.id === koId);
+          if (ko && ko.competencyIds.length > 0) {
+            compCode = ko.competencyIds[0];
+            compTitle = ko.title;
+            break;
+          }
+        }
+      }
+    }
+
     const currentComp = studentMasteryMap.get(compCode) || {
       competencyCode: compCode,
-      competencyTitle: 'Continuité et TVI',
-      masteryProbability: 0.70,
-      status: 'IN_PROGRESS',
+      competencyTitle: compTitle,
+      masteryProbability: 0,
+      status: 'NOT_STARTED' as const,
       lastPracticedDate: new Date().toISOString(),
-      memoryStabilityDays: 3,
+      memoryStabilityDays: 1,
       predictedRetentionPercent: 100,
     };
 

@@ -83,7 +83,7 @@ class ConfigManager {
     const appEnv = (typeof process !== 'undefined' && process.env?.VITE_APP_ENV) || importMetaEnv.VITE_APP_ENV || 'production';
     const logLevel = (typeof process !== 'undefined' && process.env?.VITE_LOG_LEVEL) || importMetaEnv.VITE_LOG_LEVEL || 'debug';
     const enableDiagnostics = (typeof process !== 'undefined' && process.env?.VITE_ENABLE_DIAGNOSTICS) || importMetaEnv.VITE_ENABLE_DIAGNOSTICS || 'true';
-    const jwtSecret = (typeof process !== 'undefined' && process.env?.VITE_JWT_SECRET) || importMetaEnv.VITE_JWT_SECRET || 'qarayti-production-jwt-foundation-secret-key';
+    const jwtSecret = (typeof process !== 'undefined' && process.env?.VITE_JWT_SECRET) || importMetaEnv.VITE_JWT_SECRET || '';
 
     this.config = {
       appName: 'Qarayti.ai',

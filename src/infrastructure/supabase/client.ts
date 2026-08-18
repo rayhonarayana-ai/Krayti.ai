@@ -10,13 +10,13 @@ const metaEnv = ((import.meta as unknown) as { env?: Record<string, string> }).e
 const rawSupabaseUrl = (
   metaEnv.VITE_SUPABASE_URL ||
   (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) ||
-  'https://aeubxjknpmsrsopcatyd.supabase.co/'
+  ''
 ).trim();
 
 const rawAnonKey = (
   metaEnv.VITE_SUPABASE_ANON_KEY ||
   (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_ANON_KEY) ||
-  'sb_publishable_518vI8eL0a48iL75'
+  ''
 ).trim();
 
 const isValidSupabaseConfig = Boolean(

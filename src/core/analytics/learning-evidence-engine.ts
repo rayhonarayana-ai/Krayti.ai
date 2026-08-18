@@ -130,6 +130,8 @@ export class LearningEvidenceEngine {
           this.recordExerciseEvent(studentId, exerciseId, isCorrect, topic);
 
           // Persist append-only observation
+          // P0.4: NEVER use exerciseId as conceptId — use topic if available, otherwise mark as unmapped
+          const conceptId = topic || 'NO_COMPETENCY_MAPPING';
           const exerciseBusinessId = String(payload.submissionId || payload.attemptId || '');
           const exerciseIdempotencyKey = exerciseBusinessId
             ? `obs_ex_${studentId}_${exerciseBusinessId}`
@@ -138,7 +140,7 @@ export class LearningEvidenceEngine {
           await observationHistoryRepo.recordObservation({
             studentId,
             tenantId: event.schoolId || 'default',
-            conceptId: topic || exerciseId,
+            conceptId,
             observationType: 'EXERCISE_COMPLETION',
             evidenceSource: 'QaraytiEventBus',
             sourceEventId: event.id,

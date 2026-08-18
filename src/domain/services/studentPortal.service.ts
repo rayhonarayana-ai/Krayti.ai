@@ -62,7 +62,10 @@ export class StudentPortalService {
 
   public async submitExerciseAnswer(exerciseId: string, answer: string, studentId?: string, submissionId?: string) {
     const res = await this.practiceExerciseUseCase.submitAnswer(exerciseId, answer);
-    const activeStudentId = studentId || authService.getCurrentUser()?.id || 'student-anonymous';
+    const activeStudentId = studentId || authService.getCurrentUser()?.id;
+    if (!activeStudentId) {
+      throw new Error('Authentication required: no authenticated student identity available');
+    }
     const activeSubmissionId = submissionId || `sub_${activeStudentId}_${exerciseId}_${answer}`;
     qaraytiEventBus.publish(QaraytiEventType.STUDENT_EXERCISE_COMPLETED, activeStudentId, 'STUDENT', {
       exerciseId,
@@ -84,7 +87,10 @@ export class StudentPortalService {
 
   public async submitHomework(homeworkId: string, text: string, studentId?: string) {
     const res = await this.homeworkUseCase.submitHomework(homeworkId, text);
-    const activeStudentId = studentId || authService.getCurrentUser()?.id || 'student-anonymous';
+    const activeStudentId = studentId || authService.getCurrentUser()?.id;
+    if (!activeStudentId) {
+      throw new Error('Authentication required: no authenticated student identity available');
+    }
     qaraytiEventBus.publish(QaraytiEventType.STUDENT_HOMEWORK_SUBMITTED, activeStudentId, 'STUDENT', {
       homeworkId,
       studentName: authService.getCurrentUser()?.fullName || 'Qarayti Student',
