@@ -33,6 +33,7 @@ import {
   FaheemSession,
 } from '../../../domain/types/faheem.types';
 import { EducationLanguage } from '../../../domain/types/education.types';
+import { authService } from '../../../core/auth/auth.service';
 
 export const FaheemEngineContainer: React.FC = () => {
   const [selectedRole, setSelectedRole] = useState<FaheemRoleContext>('student');
@@ -70,7 +71,8 @@ export const FaheemEngineContainer: React.FC = () => {
     setIsLoading(true);
     try {
       const service = container.resolve<FaheemService>('FaheemService');
-      const sess = await service.startSession('usr-demouser-001', selectedRole, selectedLanguage);
+      const currentUser = authService.getCurrentUser();
+      const sess = await service.startSession(currentUser?.id || 'usr-auth-session', selectedRole, selectedLanguage);
       setActiveSession(sess);
       setConversationHistory([]);
       setLastResponse(null);
@@ -95,9 +97,10 @@ export const FaheemEngineContainer: React.FC = () => {
 
     try {
       const service = container.resolve<FaheemService>('FaheemService');
+      const currentUser = authService.getCurrentUser();
       const response = await service.query({
         sessionId: activeSession?.id,
-        userId: 'usr-demouser-001',
+        userId: currentUser?.id || 'usr-auth-session',
         query: currentQuery,
         role: selectedRole,
         language: selectedLanguage,

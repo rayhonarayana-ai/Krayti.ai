@@ -15,9 +15,10 @@ export class FaheemSessionManager {
     userId: string,
     role: FaheemRoleContext,
     language: EducationLanguage = EducationLanguage.ARABIC,
-    customContext?: Record<string, unknown>
+    customContext?: Record<string, unknown>,
+    explicitSessionId?: string
   ): FaheemSession {
-    const sessionId = `fsess-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const sessionId = explicitSessionId || `fsess-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
     const contextBuilder = new AIContextBuilder(role, language);
     if (role === 'student') contextBuilder.withStudent();

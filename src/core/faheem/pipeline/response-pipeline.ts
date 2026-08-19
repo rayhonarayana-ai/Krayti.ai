@@ -7,7 +7,7 @@ import { GeminiApiAdapter } from './gemini-adapter';
 import { FaheemToolRegistry } from '../tools/tool-registry';
 import { FaheemToolDispatcher } from '../tools/tool-dispatcher';
 import { FaheemSafetyLayer } from '../safety/safety-layer';
-import { FaheemContext, FaheemQueryResponseDTO, FaheemSafetyResult } from '../../../domain/types/faheem.types';
+import { FaheemContext, FaheemQueryResponseDTO, FaheemSafetyResult, FaheemMessage } from '../../../domain/types/faheem.types';
 import { FaheemPromptEngine } from '../prompts/prompt-engine';
 import { FaheemPromptTemplates } from '../prompts/templates';
 import { logger } from '../../logging/logger';
@@ -34,7 +34,8 @@ export class FaheemResponsePipeline {
     query: string,
     context: FaheemContext,
     sessionId: string,
-    messageId: string
+    messageId: string,
+    history: FaheemMessage[] = []
   ): Promise<FaheemQueryResponseDTO> {
     const startTime = performance.now();
 
@@ -60,8 +61,14 @@ export class FaheemResponsePipeline {
     const systemPrompt = FaheemPromptEngine.buildSystemPrompt(context);
     const cleanQuery = FaheemPromptEngine.optimizeUserQuery(query);
 
-    // 3. Gemini Generation
-    const generationResult = await this.adapter.generateResponse(cleanQuery, systemPrompt, this.toolRegistry);
+    // 3. Gemini Generation with explicit language and multi-turn history
+    const generationResult = await this.adapter.generateResponse(
+      cleanQuery,
+      systemPrompt,
+      this.toolRegistry,
+      context.language,
+      history
+    );
 
     // 4. Tool Execution Loop
     const toolExecutions: Array<{

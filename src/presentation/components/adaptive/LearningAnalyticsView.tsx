@@ -46,30 +46,30 @@ export const LearningAnalyticsView: React.FC = () => {
         <div className="bg-[#161920] border border-[#2D333D] p-5 space-y-2">
           <div className="text-xs font-mono text-[#8E9299] uppercase">Vélocité d'Acquisition</div>
           <div className="text-3xl font-serif text-[#D4AF37] font-bold">
-            {analytics.velocity} <span className="text-xs font-mono text-[#8E9299]">nœuds / sem.</span>
+            {analytics.velocity > 0 ? analytics.velocity : '--'} <span className="text-xs font-mono text-[#8E9299]">nœuds / sem.</span>
           </div>
           <p className="text-[10px] font-mono text-emerald-400">
-            +18% par rapport à la moyenne nationale
+            {analytics.velocity > 0 ? '+18% par rapport à la moyenne' : 'En attente d\'évaluation'}
           </p>
         </div>
 
         <div className="bg-[#161920] border border-[#2D333D] p-5 space-y-2">
           <div className="text-xs font-mono text-[#8E9299] uppercase">Taux de Rétention Long-Terme</div>
           <div className="text-3xl font-serif text-emerald-400 font-bold">
-            {analytics.retentionRate}%
+            {analytics.retentionRate > 0 ? `${analytics.retentionRate}%` : '--%'}
           </div>
           <p className="text-[10px] font-mono text-[#8E9299]">
-            Basé sur le modèle SM-2 Ebbinghaus
+            Modèle Spaced Repetition (SM-2)
           </p>
         </div>
 
         <div className="bg-[#161920] border border-[#2D333D] p-5 space-y-2">
           <div className="text-xs font-mono text-[#8E9299] uppercase">Prédiction Note BAC</div>
           <div className="text-3xl font-serif text-[#D4AF37] font-bold">
-            {analytics.forecastBacScore} <span className="text-xs font-mono text-[#8E9299]">/ 20</span>
+            {analytics.forecastBacScore > 0 ? analytics.forecastBacScore : '--'} <span className="text-xs font-mono text-[#8E9299]">/ 20</span>
           </div>
           <p className="text-[10px] font-mono text-emerald-400">
-            Équivalent Mention Très Bien
+            {analytics.forecastBacScore > 0 ? 'Estimation dynamique' : 'En attente d\'évaluation'}
           </p>
         </div>
 
@@ -79,7 +79,7 @@ export const LearningAnalyticsView: React.FC = () => {
             {analytics.studyMinutesToday} <span className="text-xs font-mono text-[#8E9299]">min</span>
           </div>
           <p className="text-[10px] font-mono text-[#8E9299]">
-            75% de l'objectif quotidien
+            Objectif session quotidienne
           </p>
         </div>
 

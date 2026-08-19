@@ -63,8 +63,19 @@ export class FaheemOrchestrator {
         dto.userId,
         dto.role,
         dto.language,
-        dto.customContext
+        dto.customContext,
+        dto.sessionId
       );
+    } else {
+      // Sync language and role if changed
+      if (dto.language) {
+        session.language = dto.language;
+        session.context.language = dto.language;
+      }
+      if (dto.role) {
+        session.role = dto.role;
+        session.context.role = dto.role;
+      }
     }
 
     // 4. Record User Message
@@ -75,9 +86,12 @@ export class FaheemOrchestrator {
       session.language
     );
 
+    // Retrieve multi-turn history for this session
+    const conversationHistory = this.conversationManager.getHistory(session.id);
+
     // 5. Execute Response Pipeline with Retry Policy
     const responseDTO = await FaheemRetryPolicy.executeWithRetry(async () => {
-      return this.pipeline.process(dto.query, session!.context, session!.id, userMsg.id);
+      return this.pipeline.process(dto.query, session!.context, session!.id, userMsg.id, conversationHistory);
     });
 
     // 6. Record Assistant Message

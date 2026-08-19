@@ -33,6 +33,9 @@ export class RealtimeEngine {
         logger.debug('RealtimeEngine', `Heartbeat ping across ${this.activeChannelsCount} pooled channel subscriptions.`);
       }
     }, 30000);
+    if (this.heartbeatInterval && typeof this.heartbeatInterval.unref === 'function') {
+      this.heartbeatInterval.unref();
+    }
   }
 
   public subscribe<T>(channel: string, subscriber: RealtimeSubscriber<T>): () => void {

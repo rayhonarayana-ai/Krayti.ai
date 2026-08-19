@@ -24,16 +24,20 @@ import { authService } from '../../../core/auth/auth.service';
 import { EducationLanguage, EducationLevel, HighSchoolTrack } from '../../../domain/types/education.types';
 
 export const AiTutorView: React.FC = () => {
+  const authUser = authService.getCurrentUser();
+  const studentDisplayName = authUser?.email ? authUser.email.split('@')[0] : 'تلميذي العزيز';
+
   const [messages, setMessages] = useState<
     Array<{ id: string; sender: 'user' | 'faheem'; text: string; topic?: string; time: string }>
   >([
     {
       id: 'm1',
       sender: 'faheem',
-      text: 'مرحباً يوسف! أنا معلمك الذكي "فهيم" الخاص بالبكالوريا المغربية (مسلك العلوم الرياضية). كيف يمكنني مساعدتك في درس اليوم (الأعداد العقدية، ثنائي القطب RC، أو المقالات الفلسفية)؟',
+      text: `أهلاً بك يا بطل! أنا أستاذك الخصوصي "فهيم" 🌟. جالس معاك باش نبسطو أي درس فالمقرر المغربي خطوة بخطوة، ونفهمو الفكرة قبل الحساب و"علاش" درنا كل قاعدة حتى تضبطها مزيان للامتحان. شنو باغي نبداو دابا؟`,
       time: '10:00 AM',
     },
   ]);
+  const [sessionId] = useState<string>(() => `fsess-std-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`);
   const [inputQuery, setInputQuery] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('Mathématiques');
   const [selectedLang, setSelectedLang] = useState<EducationLanguage>(EducationLanguage.DARIJA);
@@ -56,13 +60,17 @@ export const AiTutorView: React.FC = () => {
 
     try {
       const faheemService = container.resolve<FaheemService>('FaheemService');
-      const authUser = authService.getCurrentUser();
+      const currentUser = authService.getCurrentUser();
       const response = await faheemService.processQuery({
-        sessionId: `faheem-session-${Date.now()}`,
-        userId: authUser?.id || '',
+        sessionId,
+        userId: currentUser?.id || 'std-anon',
         query: currentQuery,
         role: 'student',
         language: selectedLang,
+        customContext: {
+          studentName: currentUser?.email?.split('@')[0] || 'Étudiant',
+          subject: selectedSubject,
+        },
       });
 
       setMessages((prev) => [
@@ -70,7 +78,7 @@ export const AiTutorView: React.FC = () => {
         {
           id: `f-${Date.now()}`,
           sender: 'faheem',
-          text: response.content || 'عذراً يوسف، يمكنك إعادة طرح السؤال بوضوح وسأشرح لك بالتفصيل.',
+          text: response.content || 'يمكنك إعادة طرح السؤال وسأشرح لك بالتفصيل خطوة بخطوة.',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
@@ -80,7 +88,9 @@ export const AiTutorView: React.FC = () => {
         {
           id: `f-${Date.now()}`,
           sender: 'faheem',
-          text: `[إجابة فهيم التوضيحية فـ ${selectedSubject}]:\nبخصوص سؤالك: "${currentQuery}"، فـ المقرر المغربي للبكالوريا نعتمد على الخطوات التالية:\n1) حساب المميز أو المعيار.\n2) تطبيق الخاصية المرجعية للوطني.\n3) التحقق من النتيجة.`,
+          text: selectedLang === EducationLanguage.FRENCH
+            ? "Prenons un petit exemple simple ensemble pour comprendre étape par étape. Que penses-tu de cette première étape ?"
+            : "شوف معايا يا بطل.. خلينا ناخدو مثال بسيط ونخدموه خطوة بخطوة قبل أي قاعدة. شنو رأيك نبداو بالخطوة الأولى؟",
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
@@ -90,10 +100,10 @@ export const AiTutorView: React.FC = () => {
   };
 
   const quickPrompts = [
-    'اشرح لي قانون موآفر (Formule de Moivre) بالدارجة المغربية',
-    'كيفاش نحسب ثابتة الزمن \\tau لدارة RC؟',
-    'اعطيني منهجية كتابة مقالة فلسفية لمفهوم الشخص',
-    'تمرين تطبيقي سريعة في الأعداد العقدية مع التصحيح',
+    'علاش كنقلبو الإشارة فالمتراجحة ملي كنضربو فعدد سالب؟',
+    'ما فهمتش المميز دلتا Δ ومنين جات القاعدة ديالو؟',
+    'اشرحلي كيف نحل معادلات الدرجة الثانية ax² + bx + c = 0',
+    'كيفاش نحسب ثابتة الزمن \\tau لدارة RC فالفيزياء؟',
   ];
 
   return (

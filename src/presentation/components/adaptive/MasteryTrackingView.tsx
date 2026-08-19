@@ -15,9 +15,10 @@ export const MasteryTrackingView: React.FC = () => {
   const [simulatedTime, setSimulatedTime] = useState<number>(45);
 
   const currentRecord = masteryMap.get(selectedNode.id);
-  const pKnown = currentRecord ? currentRecord.masteryScore : 0.25;
-  const confidence = currentRecord ? currentRecord.confidenceInterval : [0.1, 0.4];
-  const bkt = currentRecord ? currentRecord.bkt : { pKnown: 0.25, pTransit: 0.15, pSlip: 0.1, pGuess: 0.2 };
+  const isObserved = currentRecord && currentRecord.evidenceState === 'OBSERVED' && currentRecord.masteryScore !== null;
+  const pKnown = isObserved ? currentRecord.masteryScore : null;
+  const confidence = currentRecord ? currentRecord.confidenceInterval : [0, 0];
+  const bkt = currentRecord ? currentRecord.bkt : { pKnown: 0, pTransit: 0.15, pSlip: 0.1, pGuess: 0.2 };
 
   const bloomLevels: BloomLevel[] = ['REMEMBER', 'UNDERSTAND', 'APPLY', 'ANALYZE', 'EVALUATE', 'CREATE'];
 
@@ -44,7 +45,7 @@ export const MasteryTrackingView: React.FC = () => {
           <div className="space-y-1.5 max-h-[500px] overflow-y-auto pr-1">
             {nodes.map((node) => {
               const rec = masteryMap.get(node.id);
-              const score = rec ? rec.masteryScore : 0.25;
+              const nodeObserved = rec && rec.evidenceState === 'OBSERVED' && rec.masteryScore !== null;
               const isSelected = selectedNode.id === node.id;
 
               return (
@@ -63,7 +64,7 @@ export const MasteryTrackingView: React.FC = () => {
                   </div>
                   <div className="text-right">
                     <div className="text-xs font-mono text-[#D4AF37] font-bold">
-                      {(score * 100).toFixed(0)}%
+                      {nodeObserved ? `${((rec?.masteryScore || 0) * 100).toFixed(0)}%` : '--%'}
                     </div>
                     <div className="text-[9px] font-mono text-[#8E9299]">
                       {rec?.attemptsCount || 0} ess.
@@ -90,10 +91,10 @@ export const MasteryTrackingView: React.FC = () => {
               <div className="text-right">
                 <span className="text-xs font-mono text-[#8E9299]">Probabilité P(L_t)</span>
                 <div className="text-3xl font-serif font-bold text-[#D4AF37]">
-                  {(pKnown * 100).toFixed(1)}%
+                  {pKnown !== null ? `${(pKnown * 100).toFixed(1)}%` : 'Non évalué'}
                 </div>
                 <div className="text-[10px] font-mono text-emerald-400">
-                  IC: [{(confidence[0] * 100).toFixed(0)}% — {(confidence[1] * 100).toFixed(0)}%]
+                  {isObserved ? `IC: [${(confidence[0] * 100).toFixed(0)}% — ${(confidence[1] * 100).toFixed(0)}%]` : 'En attente d\'observation'}
                 </div>
               </div>
             </div>
