@@ -36,9 +36,25 @@ export const KnowledgeGraphView: React.FC = () => {
 
   const getNodeColor = (nodeId: string) => {
     const record = masteryMap.get(nodeId);
-    const score = record ? record.masteryScore : 0.25;
-    if (score >= 0.85) return { border: 'border-emerald-500', bg: 'bg-emerald-950/40', text: 'text-emerald-400', badge: 'MAÎTRISÉ' };
-    if (score < 0.35) return { border: 'border-rose-500', bg: 'bg-rose-950/40', text: 'text-rose-400', badge: 'LACUNE' };
+    
+    // Case 1: NO_EVIDENCE or record missing or masteryScore is null
+    if (!record || record.evidenceState === 'NO_EVIDENCE' || record.masteryScore === null) {
+      return { border: 'border-[#2D333D]', bg: 'bg-[#161920]', text: 'text-[#8E9299]', badge: 'NON ÉVALUÉ' };
+    }
+
+    // Case 2: INSUFFICIENT_EVIDENCE (1 observation)
+    if (record.evidenceState === 'INSUFFICIENT_EVIDENCE') {
+      return { border: 'border-sky-500/60', bg: 'bg-sky-950/30', text: 'text-sky-400', badge: 'EN ÉVALUATION' };
+    }
+
+    // Case 3: OBSERVED with numeric masteryScore
+    const score = record.masteryScore;
+    if (score >= 0.85) {
+      return { border: 'border-emerald-500', bg: 'bg-emerald-950/40', text: 'text-emerald-400', badge: 'MAÎTRISÉ' };
+    }
+    if (score < 0.35) {
+      return { border: 'border-rose-500', bg: 'bg-rose-950/40', text: 'text-rose-400', badge: 'LACUNE' };
+    }
     return { border: 'border-amber-500', bg: 'bg-amber-950/40', text: 'text-amber-400', badge: 'EN COURS' };
   };
 
@@ -93,6 +109,10 @@ export const KnowledgeGraphView: React.FC = () => {
             <div className="flex items-center space-x-2">
               <span className="w-2.5 h-2.5 bg-rose-500 rounded-full"></span>
               <span className="text-rose-400">Lacune / Alerte (&lt; 35%)</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="w-2.5 h-2.5 bg-[#8E9299] rounded-full"></span>
+              <span className="text-[#8E9299]">Non évalué (0 obs.)</span>
             </div>
           </div>
 
@@ -165,19 +185,30 @@ export const KnowledgeGraphView: React.FC = () => {
                   <div className="mt-2 w-full bg-[#2D333D] h-1.5 rounded-none overflow-hidden">
                     <div
                       className={`h-full transition-all duration-500 ${
-                        record && record.masteryScore >= 0.85
+                        !record || record.evidenceState === 'NO_EVIDENCE' || record.masteryScore === null
+                          ? 'bg-transparent'
+                          : record.evidenceState === 'INSUFFICIENT_EVIDENCE'
+                          ? 'bg-sky-400'
+                          : record.masteryScore >= 0.85
                           ? 'bg-emerald-400'
-                          : record && record.masteryScore < 0.35
+                          : record.masteryScore < 0.35
                           ? 'bg-rose-500'
                           : 'bg-amber-400'
                       }`}
-                      style={{ width: `${record ? Math.round(record.masteryScore * 100) : 25}%` }}
+                      style={{
+                        width:
+                          record && record.masteryScore !== null && (record.evidenceState === 'OBSERVED' || record.evidenceState === 'INSUFFICIENT_EVIDENCE')
+                            ? `${Math.round(record.masteryScore * 100)}%`
+                            : '0%',
+                      }}
                     />
                   </div>
                   <div className="flex justify-between items-center text-[9px] font-mono text-[#8E9299] mt-1">
                     <span>BAC: {node.nationalExamWeight}%</span>
                     <span className="text-[#D4AF37]">
-                      {record ? `${Math.round(record.masteryScore * 100)}%` : '25%'}
+                      {record && record.masteryScore !== null && (record.evidenceState === 'OBSERVED' || record.evidenceState === 'INSUFFICIENT_EVIDENCE')
+                        ? `${Math.round(record.masteryScore * 100)}%`
+                        : '--%'}
                     </span>
                   </div>
                 </div>

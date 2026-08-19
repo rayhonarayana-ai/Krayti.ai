@@ -35,7 +35,7 @@ export class FaheemResponsePipeline {
     context: FaheemContext,
     sessionId: string,
     messageId: string,
-    conversationHistory?: FaheemMessage[]
+    history: FaheemMessage[] = []
   ): Promise<FaheemQueryResponseDTO> {
     const startTime = performance.now();
 
@@ -61,8 +61,14 @@ export class FaheemResponsePipeline {
     const systemPrompt = FaheemPromptEngine.buildSystemPrompt(context);
     const cleanQuery = FaheemPromptEngine.optimizeUserQuery(query);
 
-    // 3. Gemini Generation
-    const generationResult = await this.adapter.generateResponse(cleanQuery, systemPrompt, this.toolRegistry, context.language, conversationHistory);
+    // 3. Gemini Generation with explicit language and multi-turn history
+    const generationResult = await this.adapter.generateResponse(
+      cleanQuery,
+      systemPrompt,
+      this.toolRegistry,
+      context.language,
+      history
+    );
 
     // 4. Tool Execution Loop
     const toolExecutions: Array<{

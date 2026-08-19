@@ -72,7 +72,8 @@ export class BKTEngine {
   /**
    * Evaluates overall node status derived from BKT pKnown score.
    */
-  public static evaluateNodeStatus(pKnown: number): 'locked' | 'available' | 'in_progress' | 'mastered' | 'weak' {
+  public static evaluateNodeStatus(pKnown: number, attemptsCount: number = 0): 'locked' | 'available' | 'in_progress' | 'mastered' | 'weak' {
+    if (attemptsCount === 0) return 'available';
     if (pKnown >= 0.85) return 'mastered';
     if (pKnown < 0.35) return 'weak';
     return 'in_progress';

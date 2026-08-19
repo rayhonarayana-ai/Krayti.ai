@@ -63,8 +63,19 @@ export class FaheemOrchestrator {
         dto.userId,
         dto.role,
         dto.language,
-        dto.customContext
+        dto.customContext,
+        dto.sessionId
       );
+    } else {
+      // Sync language and role if changed
+      if (dto.language) {
+        session.language = dto.language;
+        session.context.language = dto.language;
+      }
+      if (dto.role) {
+        session.role = dto.role;
+        session.context.role = dto.role;
+      }
     }
 
     // 4. Record User Message

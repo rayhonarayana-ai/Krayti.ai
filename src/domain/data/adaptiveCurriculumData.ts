@@ -13,38 +13,7 @@ import {
   StudentProfile,
 } from '../types/adaptive.types';
 
-export const INITIAL_STUDENT_PROFILES: StudentProfile[] = [
-  {
-    id: 'student-1',
-    name: 'Youssef El Amrani',
-    level: EducationLevel.HIGH_SCHOOL,
-    track: HighSchoolTrack.MATHEMATICS_A,
-    abilityTheta: 0.85, // Above average (+0.85 SD)
-    xp: 4250,
-    streakDays: 14,
-    targetBacScore: 17.5,
-  },
-  {
-    id: 'student-2',
-    name: 'Salma Benjelloun',
-    level: EducationLevel.HIGH_SCHOOL,
-    track: HighSchoolTrack.PHYSICS_CHEMISTRY,
-    abilityTheta: -0.20, // Slightly below average, needs foundational review
-    xp: 1890,
-    streakDays: 5,
-    targetBacScore: 15.0,
-  },
-  {
-    id: 'student-3',
-    name: 'Amine Chraibi',
-    level: EducationLevel.HIGH_SCHOOL,
-    track: HighSchoolTrack.LIFE_EARTH_SCIENCES,
-    abilityTheta: 1.40, // High achiever (+1.40 SD)
-    xp: 8900,
-    streakDays: 28,
-    targetBacScore: 18.8,
-  },
-];
+export const INITIAL_STUDENT_PROFILES: StudentProfile[] = [];
 
 export const KNOWLEDGE_NODES: KnowledgeNode[] = [
   // MATHEMATICS (2BAC Sci Math / Phys)
@@ -284,7 +253,7 @@ export const SKILL_TREE_NODES: SkillTreeNode[] = [
     titleAr: 'النهايات والاتصال',
     category: 'Calculus',
     tier: 1,
-    status: 'mastered',
+    status: 'available',
     iconName: 'TrendingUp',
     xpReward: 150,
     prerequisiteSkillIds: [],
@@ -296,7 +265,7 @@ export const SKILL_TREE_NODES: SkillTreeNode[] = [
     titleAr: 'الاشتقاق وتطبيقاته',
     category: 'Calculus',
     tier: 2,
-    status: 'in_progress',
+    status: 'locked',
     iconName: 'Activity',
     xpReward: 250,
     prerequisiteSkillIds: ['st-math-1'],
@@ -308,7 +277,7 @@ export const SKILL_TREE_NODES: SkillTreeNode[] = [
     titleAr: 'الدوال اللوغاريتمية',
     category: 'Analysis',
     tier: 3,
-    status: 'available',
+    status: 'locked',
     iconName: 'Maximize2',
     xpReward: 350,
     prerequisiteSkillIds: ['st-math-2'],
@@ -344,7 +313,7 @@ export const SKILL_TREE_NODES: SkillTreeNode[] = [
     titleAr: 'الأعداد العقدية',
     category: 'Algebra',
     tier: 3,
-    status: 'weak',
+    status: 'locked',
     iconName: 'Compass',
     xpReward: 400,
     prerequisiteSkillIds: [],
@@ -356,7 +325,7 @@ export const SKILL_TREE_NODES: SkillTreeNode[] = [
     titleAr: 'الموجات الميكانيكية',
     category: 'Physics Waves',
     tier: 1,
-    status: 'mastered',
+    status: 'available',
     iconName: 'Radio',
     xpReward: 180,
     prerequisiteSkillIds: [],
@@ -368,7 +337,7 @@ export const SKILL_TREE_NODES: SkillTreeNode[] = [
     titleAr: 'ثنائي القطب RC',
     category: 'Electricity',
     tier: 3,
-    status: 'weak',
+    status: 'locked',
     iconName: 'Cpu',
     xpReward: 320,
     prerequisiteSkillIds: ['st-math-2'],
@@ -385,12 +354,12 @@ export const SPACED_REPETITION_CARDS: SpacedRepetitionCard[] = [
     answer: '0 (Croissance comparée)',
     answerAr: '0 (تزايد مقارن)',
     hint: 'Penser aux limites usuelles de logarithme.',
-    intervalDays: 3,
-    easeFactor: 2.4,
-    repetitionCount: 2,
-    lastReviewDate: '2026-08-01T10:00:00.000Z',
-    nextReviewDate: '2026-08-04T10:00:00.000Z', // Due tomorrow
-    retentionProbability: 0.78,
+    intervalDays: 1,
+    easeFactor: 2.5,
+    repetitionCount: 0,
+    lastReviewDate: '',
+    nextReviewDate: '',
+    retentionProbability: 1.0,
   },
   {
     id: 'card-2',
@@ -402,11 +371,11 @@ export const SPACED_REPETITION_CARDS: SpacedRepetitionCard[] = [
     answerAr: 'tau = R * C (مقدرة بالثواني)',
     hint: 'Produit de la résistance par la capacité.',
     intervalDays: 1,
-    easeFactor: 1.9, // Lower ease factor because student struggled before
-    repetitionCount: 1,
-    lastReviewDate: '2026-08-02T15:00:00.000Z',
-    nextReviewDate: '2026-08-03T09:00:00.000Z', // OVERDUE NOW
-    retentionProbability: 0.42,
+    easeFactor: 2.5,
+    repetitionCount: 0,
+    lastReviewDate: '',
+    nextReviewDate: '',
+    retentionProbability: 1.0,
   },
   {
     id: 'card-3',
@@ -417,12 +386,12 @@ export const SPACED_REPETITION_CARDS: SpacedRepetitionCard[] = [
     answer: '|z| = sqrt(a^2 + b^2)',
     answerAr: '|z| = الجذر التربيعي لـ (a^2 + b^2)',
     hint: 'Théorème de Pythagore dans le plan complexe.',
-    intervalDays: 6,
-    easeFactor: 2.6,
-    repetitionCount: 4,
-    lastReviewDate: '2026-07-28T12:00:00.000Z',
-    nextReviewDate: '2026-08-03T12:00:00.000Z', // Due today
-    retentionProbability: 0.65,
+    intervalDays: 1,
+    easeFactor: 2.5,
+    repetitionCount: 0,
+    lastReviewDate: '',
+    nextReviewDate: '',
+    retentionProbability: 1.0,
   },
   {
     id: 'card-4',
@@ -433,12 +402,12 @@ export const SPACED_REPETITION_CARDS: SpacedRepetitionCard[] = [
     answer: '38 ATP (ou 36 selon le type de navette)',
     answerAr: '38 جزيء ATP (أو 36 حسب نوع المكوك)',
     hint: 'Glycolyse (2 ATP) + Krebs & Phosphorylation (34-36 ATP)',
-    intervalDays: 12,
-    easeFactor: 2.7,
-    repetitionCount: 5,
-    lastReviewDate: '2026-07-20T10:00:00.000Z',
-    nextReviewDate: '2026-08-01T10:00:00.000Z', // Overdue
-    retentionProbability: 0.55,
+    intervalDays: 1,
+    easeFactor: 2.5,
+    repetitionCount: 0,
+    lastReviewDate: '',
+    nextReviewDate: '',
+    retentionProbability: 1.0,
   },
   {
     id: 'card-5',
@@ -449,12 +418,12 @@ export const SPACED_REPETITION_CARDS: SpacedRepetitionCard[] = [
     answer: 'Sur la raison pratique et la dignité intrinsèque (l\'Homme comme fin en soi).',
     answerAr: 'على العقل العلمي والكرامة المتأصلة (الإنسان كغاية في حد ذاته).',
     hint: 'Imperatif catégorique.',
-    intervalDays: 4,
+    intervalDays: 1,
     easeFactor: 2.5,
-    repetitionCount: 3,
-    lastReviewDate: '2026-07-30T16:00:00.000Z',
-    nextReviewDate: '2026-08-03T16:00:00.000Z',
-    retentionProbability: 0.81,
+    repetitionCount: 0,
+    lastReviewDate: '',
+    nextReviewDate: '',
+    retentionProbability: 1.0,
   },
 ];
 

@@ -42,7 +42,16 @@ export const RecommendationEngineView: React.FC = () => {
       </div>
 
       <div className="space-y-4">
-        {recommendations.map((rec, index) => {
+        {recommendations.length === 0 ? (
+          <div className="bg-[#161920] border border-[#2D333D] p-12 text-center space-y-4">
+            <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
+            <h3 className="text-base font-serif italic text-[#EAE9E6]">Aucune Recommandation Urgente</h3>
+            <p className="text-xs font-mono text-[#8E9299] max-w-md mx-auto">
+              Toutes les compétences sont à jour ou en attente d'évaluation initiale. Commencez vos leçons pour générer un parcours personnalisé.
+            </p>
+          </div>
+        ) : (
+          recommendations.map((rec, index) => {
           const badgeStyle = getBadgeStyle(rec.reasonBadge);
 
           return (
@@ -98,7 +107,7 @@ export const RecommendationEngineView: React.FC = () => {
               </div>
             </div>
           );
-        })}
+        }))}
       </div>
     </div>
   );

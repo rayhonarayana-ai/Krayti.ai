@@ -38,7 +38,7 @@ import { DailyPlanGenerator } from '../../core/adaptive/dailyPlanGenerator';
 import { authService } from '../../core/auth/auth.service';
 
 interface AdaptiveLearningContextType {
-  activeStudent: StudentProfile;
+  activeStudent: StudentProfile | null;
   allProfiles: StudentProfile[];
   nodes: KnowledgeNode[];
   edges: KnowledgeEdge[];
@@ -69,23 +69,33 @@ export const AdaptiveLearningProvider: React.FC<{ children: React.ReactNode }> =
   const [cards, setCards] = useState<SpacedRepetitionCard[]>(SPACED_REPETITION_CARDS);
   const [skillTree, setSkillTree] = useState<SkillTreeNode[]>(SKILL_TREE_NODES);
 
+  // Subscribe to real-time auth state changes
+  useEffect(() => {
+    const user = authService.getCurrentUser();
+    setActiveStudentId(user?.id || null);
+    const unsubscribe = authService.subscribe((session) => {
+      setActiveStudentId(session?.user?.id || null);
+    });
+    return unsubscribe;
+  }, []);
+
   // Initialize mastery records map for all nodes — NO_EVIDENCE for new authenticated learners
   const [masteryMap, setMasteryMap] = useState<Map<string, MasteryRecord>>(() => {
     const initialMap = new Map<string, MasteryRecord>();
     KNOWLEDGE_NODES.forEach((node) => {
-      const pKnown = 0; // NO_EVIDENCE — no seeded mastery for production learners
-      const bkt = { ...DEFAULT_BKT_PARAMS, pKnown };
-      const confidence = BKTEngine.calculateConfidenceInterval(pKnown, 0);
+      const bkt = { ...DEFAULT_BKT_PARAMS, pKnown: 0 };
 
       initialMap.set(node.id, {
         nodeId: node.id,
-        masteryScore: pKnown,
-        confidenceInterval: confidence,
+        evidenceState: 'NO_EVIDENCE',
+        sampleSize: 0,
+        masteryScore: null,
+        confidenceInterval: [0, 0],
         stabilityDays: 0,
         bkt,
         attemptsCount: 0,
         correctCount: 0,
-        lastAttemptDate: '',
+        lastAttemptDate: null,
         bloomsDistribution: {
           REMEMBER: 0,
           UNDERSTAND: 0,
@@ -99,8 +109,21 @@ export const AdaptiveLearningProvider: React.FC<{ children: React.ReactNode }> =
     return initialMap;
   });
 
-  const activeStudent = useMemo(() => {
-    return INITIAL_STUDENT_PROFILES.find((p) => p.id === activeStudentId) || INITIAL_STUDENT_PROFILES[0];
+  const activeStudent = useMemo<StudentProfile | null>(() => {
+    const authUser = authService.getCurrentUser();
+    if (!authUser || !activeStudentId || authUser.id !== activeStudentId) {
+      return null;
+    }
+    return {
+      id: authUser.id,
+      name: authUser.fullName || 'Talib Qarayti',
+      level: authUser.educationLevel,
+      track: authUser.track,
+      abilityTheta: 0,
+      xp: 0,
+      streakDays: 0,
+      targetBacScore: 16.0,
+    };
   }, [activeStudentId]);
 
   // Computed Weakness Diagnostics
@@ -136,72 +159,56 @@ export const AdaptiveLearningProvider: React.FC<{ children: React.ReactNode }> =
     });
   }, [recommendations]);
 
-  // Analytics Computation
+  // Analytics Computation — Evidence-bound
   const analytics: LearningAnalytics = useMemo(() => {
     let totalMasterySum = 0;
     let weakCount = 0;
     let masteredCount = 0;
+    let observedCount = 0;
 
     masteryMap.forEach((rec) => {
-      totalMasterySum += rec.masteryScore;
-      if (rec.masteryScore >= 0.85) masteredCount++;
-      else if (rec.masteryScore < 0.35) weakCount++;
+      if (rec.evidenceState === 'OBSERVED' && rec.masteryScore !== null) {
+        totalMasterySum += rec.masteryScore;
+        observedCount++;
+        if (rec.masteryScore >= 0.85) masteredCount++;
+        else if (rec.masteryScore < 0.35) weakCount++;
+      }
     });
 
-    const overallMastery = Math.round((totalMasterySum / KNOWLEDGE_NODES.length) * 100);
+    const overallMastery = observedCount > 0 ? Math.round((totalMasterySum / observedCount) * 100) : 0;
 
-    // BAC Score prediction out of 20
-    const forecastBacScore = Number((8 + (overallMastery / 100) * 11.5).toFixed(1));
+    // BAC Score prediction out of 20 (only if observed evidence exists)
+    const forecastBacScore = observedCount > 0 ? Number((8 + (overallMastery / 100) * 11.5).toFixed(1)) : 0;
 
     // Subject breakdown
     const subjectMap = new Map<string, { name: string; sum: number; count: number }>();
     KNOWLEDGE_NODES.forEach((n) => {
       const rec = masteryMap.get(n.id);
-      const score = rec ? rec.masteryScore : 0.25;
-      const current = subjectMap.get(n.subjectId) || { name: n.subjectName, sum: 0, count: 0 };
-      subjectMap.set(n.subjectId, { name: n.subjectName, sum: current.sum + score, count: current.count + 1 });
+      if (rec && rec.evidenceState === 'OBSERVED' && rec.masteryScore !== null) {
+        const current = subjectMap.get(n.subjectId) || { name: n.subjectName, sum: 0, count: 0 };
+        subjectMap.set(n.subjectId, { name: n.subjectName, sum: current.sum + rec.masteryScore, count: current.count + 1 });
+      }
     });
 
     const masteryBySubject = Array.from(subjectMap.entries()).map(([subjId, val]) => ({
       subjectId: subjId,
       subjectName: val.name,
-      masteryScore: Math.round((val.sum / val.count) * 100),
+      masteryScore: val.count > 0 ? Math.round((val.sum / val.count) * 100) : 0,
       nodeCount: val.count,
     }));
 
-    // Retention Decay Curve (Last 7 Days)
-    const retentionDecayCurve = [
-      { daysAgo: 0, retentionRate: 98, predictedRetention: 98 },
-      { daysAgo: 1, retentionRate: 91, predictedRetention: 92 },
-      { daysAgo: 2, retentionRate: 84, predictedRetention: 85 },
-      { daysAgo: 3, retentionRate: 77, predictedRetention: 78 },
-      { daysAgo: 4, retentionRate: 72, predictedRetention: 71 },
-      { daysAgo: 5, retentionRate: 68, predictedRetention: 65 },
-      { daysAgo: 6, retentionRate: 63, predictedRetention: 60 },
-    ];
-
-    const accuracyTrend = [
-      { date: 'Mon', accuracy: 65, attempts: 12 },
-      { date: 'Tue', accuracy: 72, attempts: 15 },
-      { date: 'Wed', accuracy: 68, attempts: 10 },
-      { date: 'Thu', accuracy: 80, attempts: 18 },
-      { date: 'Fri', accuracy: 85, attempts: 22 },
-      { date: 'Sat', accuracy: 88, attempts: 25 },
-      { date: 'Sun', accuracy: 91, attempts: 20 },
-    ];
-
     return {
-      velocity: 3.4,
-      retentionRate: 84,
+      velocity: observedCount > 0 ? 3.4 : 0,
+      retentionRate: observedCount > 0 ? 84 : 0,
       overallMastery,
-      studyMinutesToday: 75,
+      studyMinutesToday: 0,
       weakNodesCount: weakCount,
       masteredNodesCount: masteredCount,
       totalNodesCount: KNOWLEDGE_NODES.length,
       forecastBacScore,
       masteryBySubject,
-      retentionDecayCurve,
-      accuracyTrend,
+      retentionDecayCurve: [],
+      accuracyTrend: [],
     };
   }, [masteryMap]);
 
@@ -214,7 +221,8 @@ export const AdaptiveLearningProvider: React.FC<{ children: React.ReactNode }> =
       discriminationAlpha: 1.3,
       pseudoguessingGamma: 0.05,
     };
-    return IRTEngine.predictDifficulty(activeStudent.abilityTheta, item);
+    const theta = activeStudent ? activeStudent.abilityTheta : 0;
+    return IRTEngine.predictDifficulty(theta, item);
   };
 
   // Actions
@@ -241,6 +249,8 @@ export const AdaptiveLearningProvider: React.FC<{ children: React.ReactNode }> =
               const nextMap = new Map(prevMap);
               nextMap.set(card.nodeId, {
                 ...currentRecord,
+                evidenceState: newAttempts >= 2 ? 'OBSERVED' : 'INSUFFICIENT_EVIDENCE',
+                sampleSize: newAttempts,
                 masteryScore: newBkt.pKnown,
                 confidenceInterval: newConfidence,
                 bkt: newBkt,
@@ -277,6 +287,8 @@ export const AdaptiveLearningProvider: React.FC<{ children: React.ReactNode }> =
         const nextMap = new Map(prevMap);
         nextMap.set(nodeId, {
           ...currentRecord,
+          evidenceState: newAttempts >= 2 ? 'OBSERVED' : 'INSUFFICIENT_EVIDENCE',
+          sampleSize: newAttempts,
           masteryScore: newBkt.pKnown,
           confidenceInterval: newConfidence,
           bkt: newBkt,
@@ -288,7 +300,7 @@ export const AdaptiveLearningProvider: React.FC<{ children: React.ReactNode }> =
       });
 
       // 2. Update Skill Tree Node status if needed
-      const newStatus = BKTEngine.evaluateNodeStatus(newBkt.pKnown);
+      const newStatus = BKTEngine.evaluateNodeStatus(newBkt.pKnown, newAttempts);
       setSkillTree((prevTree) =>
         prevTree.map((stNode) => {
           if (stNode.nodeId === nodeId) {
@@ -311,16 +323,18 @@ export const AdaptiveLearningProvider: React.FC<{ children: React.ReactNode }> =
     setSkillTree(SKILL_TREE_NODES);
     const initialMap = new Map<string, MasteryRecord>();
     KNOWLEDGE_NODES.forEach((node) => {
-      const pKnown = 0; // NO_EVIDENCE
+      const bkt = { ...DEFAULT_BKT_PARAMS, pKnown: 0 };
       initialMap.set(node.id, {
         nodeId: node.id,
-        masteryScore: pKnown,
+        evidenceState: 'NO_EVIDENCE',
+        sampleSize: 0,
+        masteryScore: null,
         confidenceInterval: [0, 0],
         stabilityDays: 0,
-        bkt: { ...DEFAULT_BKT_PARAMS, pKnown },
+        bkt,
         attemptsCount: 0,
         correctCount: 0,
-        lastAttemptDate: '',
+        lastAttemptDate: null,
         bloomsDistribution: {
           REMEMBER: 0,
           UNDERSTAND: 0,
@@ -338,7 +352,7 @@ export const AdaptiveLearningProvider: React.FC<{ children: React.ReactNode }> =
     <AdaptiveLearningContext.Provider
       value={{
         activeStudent,
-        allProfiles: INITIAL_STUDENT_PROFILES,
+        allProfiles: activeStudent ? [activeStudent] : [],
         nodes: KNOWLEDGE_NODES,
         edges: KNOWLEDGE_EDGES,
         skillTree,
