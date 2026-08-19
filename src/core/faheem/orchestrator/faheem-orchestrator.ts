@@ -75,12 +75,15 @@ export class FaheemOrchestrator {
       session.language
     );
 
-    // 5. Execute Response Pipeline with Retry Policy
+    // 5. Retrieve conversation history for multi-turn context
+    const history = this.conversationManager.getHistory(session.id);
+
+    // 6. Execute Response Pipeline with Retry Policy
     const responseDTO = await FaheemRetryPolicy.executeWithRetry(async () => {
-      return this.pipeline.process(dto.query, session!.context, session!.id, userMsg.id);
+      return this.pipeline.process(dto.query, session!.context, session!.id, userMsg.id, history);
     });
 
-    // 6. Record Assistant Message
+    // 7. Record Assistant Message
     this.conversationManager.appendMessage(
       session.id,
       'assistant',
@@ -88,11 +91,11 @@ export class FaheemOrchestrator {
       responseDTO.language
     );
 
-    // 7. Update Session State
+    // 8. Update Session State
     session.messageCount += 2;
     this.sessionManager.updateSession(session);
 
-    // 8. Record Telemetry
+    // 9. Record Telemetry
     this.telemetry.recordQuery(
       responseDTO.latencyMs,
       responseDTO.tokensUsed.inputTokens,

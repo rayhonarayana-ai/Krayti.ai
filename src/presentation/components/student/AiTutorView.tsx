@@ -38,6 +38,7 @@ export const AiTutorView: React.FC = () => {
   const [selectedSubject, setSelectedSubject] = useState('Mathématiques');
   const [selectedLang, setSelectedLang] = useState<EducationLanguage>(EducationLanguage.DARIJA);
   const [isLoading, setIsLoading] = useState(false);
+  const [sessionId] = useState(() => `faheem-session-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`);
 
   const handleSend = async () => {
     if (!inputQuery.trim() || isLoading) return;
@@ -58,7 +59,7 @@ export const AiTutorView: React.FC = () => {
       const faheemService = container.resolve<FaheemService>('FaheemService');
       const authUser = authService.getCurrentUser();
       const response = await faheemService.processQuery({
-        sessionId: `faheem-session-${Date.now()}`,
+        sessionId,
         userId: authUser?.id || '',
         query: currentQuery,
         role: 'student',
