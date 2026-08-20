@@ -225,7 +225,9 @@ $$u_C(t) = E (1 - e^{-t/\\tau})$$`,
   }
 
   public async getExercises(subjectId?: string, topic?: string): Promise<StudentExercise[]> {
-    return [
+    // Gate 06B.2B.2.1: Strip correctAnswer and solutionSteps from student-facing DTO.
+    // Answer authority remains in curriculum_exercise_grading (server-side only).
+    const exercises: StudentExercise[] = [
       {
         id: 'ex-01',
         subjectId: 'MATH',
@@ -239,12 +241,6 @@ $$u_C(t) = E (1 - e^{-t/\\tau})$$`,
           'z_1 = 2 + i\\sqrt{3}, z_2 = 2 - i\\sqrt{3}',
           'z_1 = 1 + 2i, z_2 = 1 - 2i',
         ],
-        correctAnswer: 'z_1 = \\sqrt{3} + i, z_2 = \\sqrt{3} - i',
-        solutionSteps: [
-          '1) المميز: \\Delta = (-2\\sqrt{3})^2 - 4(1)(4) = 12 - 16 = -4',
-          '2) كتابة -4 كجذر عقدي: -4 = (2i)^2',
-          '3) الجذران العقدية: z = \\frac{2\\sqrt{3} \\pm 2i}{2} = \\sqrt{3} \\pm i',
-        ],
         maxPoints: 3,
       },
       {
@@ -255,14 +251,14 @@ $$u_C(t) = E (1 - e^{-t/\\tau})$$`,
         difficulty: 'HARD',
         questionText: 'أوجد تعبير constante de temps \\tau لدارة تحتوي على موصل أومي R = 100 \\,\\Omega ومكثف سعته C = 10 \\,\\mu F.',
         hints: ['تذكر تحويل \\mu F إلى Farad: 10 \\mu F = 10 \\times 10^{-6} F'],
-        correctAnswer: '1 ms',
-        solutionSteps: [
-          '1) \\tau = R \\times C',
-          '2) \\tau = 100 \\times 10 \\times 10^{-6} = 10^{-3} \\text{ s} = 1 \\text{ ms}',
-        ],
         maxPoints: 2,
       },
     ];
+
+    if (subjectId) {
+      return exercises.filter((l) => l.subjectId === subjectId);
+    }
+    return exercises;
   }
 
   public async submitExerciseAnswer(exerciseId: string, answer: string): Promise<ExerciseSubmissionResult> {

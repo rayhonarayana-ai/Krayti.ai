@@ -43,7 +43,7 @@ export interface ExerciseSubmissionRequest {
 }
 
 /**
- * Gate 06B.2B.2: Server-verified exercise evidence result.
+ * Gate 06B.2B.2.1: Server-verified exercise evidence result.
  */
 export interface ExerciseVerificationResult {
   verified: {
@@ -51,7 +51,7 @@ export interface ExerciseVerificationResult {
     subjectCode: string;
     koCode: string;
     competencies: string[];
-    isCorrect: boolean;
+    interactionResult: 'CORRECT' | 'INCORRECT';
     gradedBy: string;
   };
 }

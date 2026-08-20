@@ -289,6 +289,9 @@ async function handleExerciseVerification(params: {
 
   // ----------------------------------------------------------
   // 4i. Construct authoritative observation
+  // Gate 06B.2B.2.1: currentMastery = 0 (neutral sentinel)
+  // A single exercise outcome is NOT concept mastery.
+  // interactionResult records the factual verified outcome.
   // ----------------------------------------------------------
   const conceptId = ko.code;
   const subjectCode = (ko as any).curriculum_subjects?.code || "UNKNOWN";
@@ -303,7 +306,9 @@ async function handleExerciseVerification(params: {
     koCode: ko.code,
     koTitle: ko.title,
     competencyCodes: competencyList.map((c) => c.code),
-    isCorrect,
+    // Gate 06B.2B.2.1: verified interaction outcome (NOT mastery)
+    // Stored in metadata to avoid schema migration on historical table
+    interactionResult: isCorrect ? "CORRECT" : "INCORRECT",
     serverGraded: true,
     evidenceSource: "TRUSTED_SERVER",
   };
@@ -322,8 +327,10 @@ async function handleExerciseVerification(params: {
     source_event_id: `exercise-verify-${exerciseCode}-${Date.now()}`,
     idempotency_key: authoritativeKey,
     previous_mastery: null,
-    current_mastery: isCorrect ? 1.0 : 0.0,
+    current_mastery: 0,
     delta: null,
+    // Gate 06B.2B.2.1: confidence = grading determinism (1.0 for exact match),
+    // NOT learner mastery confidence. These are different concepts.
     confidence: 1.0,
     metadata,
     occurred_at: new Date().toISOString(),
@@ -368,7 +375,7 @@ async function handleExerciseVerification(params: {
         subjectCode,
         koCode: ko.code,
         competencies: competencyList.map((c) => c.code),
-        isCorrect,
+        interactionResult: isCorrect ? "CORRECT" : "INCORRECT",
         gradedBy: "TRUSTED_SERVER",
       },
       ...(dataQualityWarning ? { dataQualityWarning } : {}),

@@ -231,11 +231,15 @@ export const PracticeExercisesView: React.FC<PracticeExercisesViewProps> = ({ ex
 
                   <div className="border-t border-emerald-500/20 pt-3 space-y-1">
                     <div className="text-xs font-bold text-slate-900 dark:text-white">عناصر الإجابة النموذجية:</div>
-                    {selectedExercise.solutionSteps.map((step, idx) => (
+                    {selectedExercise.solutionSteps?.map((step, idx) => (
                       <div key={idx} className="text-xs text-slate-600 dark:text-slate-400 font-mono">
                         {step}
                       </div>
-                    ))}
+                    )) || (
+                      <div className="text-xs text-slate-500 dark:text-slate-500 italic">
+                        التقييم يتم خادماً. النتيجة ستظهر بعد التحقق.
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -159,9 +159,10 @@ export class LearningEvidenceEngine {
           });
 
           if (result.success && result.verified) {
-            // Record in-memory tracker with SERVER-VERIFIED correctness
-            this.recordExerciseEvent(studentId, exerciseCode, result.verified.isCorrect, undefined);
-            logger.info('LearningEvidenceEngine', `Exercise verified: ${exerciseCode} → correct=${result.verified.isCorrect}, KO=${result.verified.koCode}`);
+            // Record in-memory tracker with SERVER-VERIFIED interaction result
+            const isCorrect = result.verified.interactionResult === 'CORRECT';
+            this.recordExerciseEvent(studentId, exerciseCode, isCorrect, undefined);
+            logger.info('LearningEvidenceEngine', `Exercise verified: ${exerciseCode} → result=${result.verified.interactionResult}, KO=${result.verified.koCode}`);
           } else if (result.success) {
             // Edge Function accepted but no verification details (legacy path)
             this.recordExerciseEvent(studentId, exerciseCode, false, undefined);
@@ -423,7 +424,16 @@ export class LearningEvidenceEngine {
       ? await observationHistoryRepo.getObservationsForConcept(studentId, conceptId)
       : await observationHistoryRepo.getObservationsForStudent(studentId);
 
-    if (!observations || observations.length === 0) {
+    // Gate 06B.2B.2.1: Filter out EXERCISE_COMPLETION observations from mastery trajectory.
+    // Exercise observations record verified interaction outcomes (correct/incorrect),
+    // NOT concept mastery. They use currentMastery=0 (neutral sentinel).
+    // Only mastery-signal observations (GAP_REMEDIATED, SKILL_MASTERED, LESSON_FINISHED)
+    // contribute to trajectory computation.
+    const masteryObservations = (observations || []).filter(
+      (o) => o.observationType !== 'EXERCISE_COMPLETION'
+    );
+
+    if (!masteryObservations || masteryObservations.length === 0) {
       return {
         studentId,
         conceptId,
@@ -440,11 +450,11 @@ export class LearningEvidenceEngine {
       };
     }
 
-    const sampleSize = observations.length;
-    const sourcesSet = new Set(observations.map((o) => o.evidenceSource));
+    const sampleSize = masteryObservations.length;
+    const sourcesSet = new Set(masteryObservations.map((o) => o.evidenceSource));
 
     if (sampleSize === 1) {
-      const single = observations[0];
+      const single = masteryObservations[0];
       return {
         studentId,
         conceptId,
@@ -461,9 +471,9 @@ export class LearningEvidenceEngine {
       };
     }
 
-    // observations are returned DESC by occurredAt from DB
-    const latestObs = observations[0];
-    const earliestObs = observations[observations.length - 1];
+    // masteryObservations are returned DESC by occurredAt from DB
+    const latestObs = masteryObservations[0];
+    const earliestObs = masteryObservations[masteryObservations.length - 1];
 
     const initialMastery = earliestObs.previousMastery !== null ? earliestObs.previousMastery : earliestObs.currentMastery;
     const latestMastery = latestObs.currentMastery;
@@ -476,7 +486,7 @@ export class LearningEvidenceEngine {
       trajectory = 'DECLINING';
     }
 
-    const totalConf = observations.reduce((acc, o) => acc + (o.confidence || 1.0), 0);
+    const totalConf = masteryObservations.reduce((acc, o) => acc + (o.confidence || 1.0), 0);
     const averageConfidence = Number((totalConf / sampleSize).toFixed(3));
 
     return {
@@ -553,16 +563,16 @@ export class LearningEvidenceEngine {
 
     const obsText = `تم تسجيل ${trajectory.sampleSize} ملاحظات تعليمية حقيقية لتقييم ${conceptLabel}. القيمة الأولية الملاحظة: ${initialVal}%، القيمة الحالية: ${latestVal}%.`;
 
-    let patternText = `مسار مستقر بمتوسط مستوى ثقة ${(trajectory.averageConfidence * 100).toFixed(0)}%.`;
+    let patternText = `مسار مستقر بمتوسط دقة التقدير ${(trajectory.averageConfidence * 100).toFixed(0)}%.`;
     let interpText = `أظهر الطالب ثباتاً في أدائه عبر التقييمات المتعاقبة.`;
     let actionText = `متابعة الخطة التعليمية الحالية مع تقديم تمارين تطبيقية إضافية لتثبيت المفهوم.`;
 
     if (trajectory.trajectory === 'IMPROVING') {
-      patternText = `مسار تحسن إيجابي مستمر بزيادة قدرها +${deltaVal}% بمتوسط مستوى ثقة ${(trajectory.averageConfidence * 100).toFixed(0)}%.`;
+      patternText = `مسار تحسن إيجابي مستمر بزيادة قدرها +${deltaVal}% بمتوسط دقة التقدير ${(trajectory.averageConfidence * 100).toFixed(0)}%.`;
       interpText = `تؤكد الملاحظات التاريخية نجاح التدخلات التعليمية وتحسن مستوى استيعاب الطالب للمفهوم.`;
       actionText = `الانتقال بالطالب إلى المستوى المتقدم أو المفاهيم الأكثر تعقيداً المرتبطة بهذا المفهوم.`;
     } else if (trajectory.trajectory === 'DECLINING') {
-      patternText = `مسار تراجع ملحوظ بمقدار ${deltaVal}% بمتوسط مستوى ثقة ${(trajectory.averageConfidence * 100).toFixed(0)}%.`;
+      patternText = `مسار تراجع ملحوظ بمقدار ${deltaVal}% بمتوسط دقة التقدير ${(trajectory.averageConfidence * 100).toFixed(0)}%.`;
       interpText = `تشير الأدلة إلى وجود سوء فهم تراكمي أو ثغرة تعليمية تتطلب معالجة فورية.`;
       actionText = `إعادة مراجعة المفاهيم القبلية وتقديم جلسة دعم استدراكية مخصصة.`;
     }

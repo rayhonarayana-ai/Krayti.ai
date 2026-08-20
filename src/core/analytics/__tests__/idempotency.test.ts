@@ -31,13 +31,13 @@ async function runIdempotencyTests() {
     if (existing) {
       return { success: true, duplicate: true, verified: existing.verified };
     }
-    // Simulate server verification result
+    // Simulate server verification result (Gate 06B.2B.2.1: interactionResult, not isCorrect)
     const verified = {
       exerciseCode: submission.exerciseCode,
       subjectCode: 'MATH',
       koCode: 'ko-math-001',
       competencies: ['COMP-MATH-2BAC-01'],
-      isCorrect: submission.answer === '42',
+      interactionResult: submission.answer === '42' ? 'CORRECT' as const : 'INCORRECT' as const,
       gradedBy: 'TRUSTED_SERVER',
     };
     const record = { ...submission, verified };
@@ -87,9 +87,9 @@ async function runIdempotencyTests() {
     assert(submittedExercises[1].submissionId === newSubmissionId, 'New submission has distinct submissionId');
     assert(submittedExercises[1].answer === '43', 'New submission has correct answer');
 
-    // TEST D: isCorrect from payload is NOT trusted — server grades independently
-    const trustedCorrectness = submittedExercises[0].verified.isCorrect;
-    assert(trustedCorrectness === true, 'Server-graded isCorrect is authoritative (answer "42" is correct)');
+    // TEST D: Server-graded interactionResult is authoritative — not client-declared isCorrect
+    const trustedResult = submittedExercises[0].verified.interactionResult;
+    assert(trustedResult === 'CORRECT', 'Server-graded interactionResult is authoritative (answer "42" is CORRECT)');
 
     // TEST E: Client cannot override canonical exercise code
     await qaraytiEventBus.publish(QaraytiEventType.STUDENT_EXERCISE_COMPLETED, studentId, 'STUDENT', {
@@ -116,9 +116,9 @@ async function runIdempotencyTests() {
 
     // TEST G: isCorrect is NOT passed to submitExerciseEvidence (not in contract)
     const testSub = submittedExercises.find((s) => s.submissionId === 'sub-trust-001');
-    assert(testSub !== undefined, 'Submission exists for isCorrect check');
+    assert(testSub !== undefined, 'Submission exists for contract check');
     assert(!('isCorrect' in testSub) || testSub.isCorrect === undefined || !('isCorrect' in { exerciseCode: 1, answer: 1, submissionId: 1, schoolId: 1 }),
-      'isCorrect is NOT in the submission contract (server derives it)');
+      'isCorrect is NOT in the submission contract (server derives interactionResult)');
 
     // TEST H: conceptId is NOT passed to submitExerciseEvidence (not in contract)
     assert(!('conceptId' in testSub) || testSub.conceptId === undefined,

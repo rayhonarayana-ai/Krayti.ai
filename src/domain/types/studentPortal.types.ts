@@ -66,8 +66,8 @@ export interface StudentExercise {
   questionText: string;
   hints: string[];
   options?: string[]; // for MCQ
-  correctAnswer?: string;
-  solutionSteps: string[];
+  // Gate 06B.2B.2.1: correctAnswer removed — answer authority in curriculum_exercise_grading (server-only)
+  solutionSteps?: string[]; // optional: only for AI-generated exercises
   maxPoints: number; // out of 20 or fractional points
   isAiGenerated?: boolean;
 }

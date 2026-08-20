@@ -1,6 +1,20 @@
 /**
  * Qarayti.ai — Learning Observation History Interface & Types
  * Sprint 2.6: Append-Only Observation History Contract
+ *
+ * Gate 06B.2B.2.1: Verified interaction semantics.
+ *
+ * currentMastery: Concept mastery score (0.0–1.0). For EXERCISE_COMPLETION observations,
+ *   this is set to 0 (neutral) because a single exercise outcome is NOT concept mastery.
+ *   Mastery is derived later by the mastery derivation gate.
+ *
+ * interactionResult: Verified exercise outcome ('CORRECT' | 'INCORRECT' | null).
+ *   Only populated for EXERCISE_COMPLETION observations. This is the factual record
+ *   of what happened, separate from mastery claims.
+ *
+ * confidence: Evidence certainty (0.0–1.0). For server-graded exercises, this means
+ *   "grading determinism" (1.0 = exact match grading). This does NOT mean
+ *   "learner mastery confidence". Do not conflate grading certainty with learner confidence.
  */
 
 export interface LearningEvidenceObservation {
@@ -16,7 +30,10 @@ export interface LearningEvidenceObservation {
   previousMastery: number | null;
   currentMastery: number;
   delta: number | null;
+  /** Evidence certainty (grader determinism), NOT learner mastery confidence. */
   confidence: number;
+  /** Gate 06B.2B.2.1: Verified exercise outcome. null for non-exercise observations. */
+  interactionResult?: 'CORRECT' | 'INCORRECT' | null;
   metadata?: Record<string, unknown>;
   occurredAt: string;
   recordedAt?: string;
