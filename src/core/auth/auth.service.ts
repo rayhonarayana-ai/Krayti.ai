@@ -11,6 +11,7 @@ import { EducationLevel, HighSchoolTrack, EducationLanguage } from '../../domain
 import { rbacManager } from './rbac.manager';
 import { logger } from '../logging/logger';
 import { supabase } from '../../infrastructure/supabase/client';
+import { envConfig } from '../config/env.config';
 
 export interface IAuthService {
   getCurrentSession(): AuthSession | null;
@@ -47,16 +48,15 @@ export class AuthService implements IAuthService {
 
   /**
    * GATE 06A: Resolve trusted role from database, NOT from user_metadata.
+   * The DB function uses auth.uid() — no parameters passed from client.
    * Priority: platform_roles (SUPER_ADMIN) > school_memberships > STUDENT default.
    */
-  private async resolveTrustedRole(userId: string): Promise<UserRole> {
+  private async resolveTrustedRole(): Promise<UserRole> {
     try {
-      const { data, error } = await supabase.rpc('get_user_trusted_role', {
-        target_user_id: userId,
-      });
+      const { data, error } = await supabase.rpc('get_user_trusted_role');
 
       if (error) {
-        logger.warn('AuthService', `Trusted role resolution failed for ${userId}: ${error.message}. Defaulting to STUDENT.`);
+        logger.warn('AuthService', `Trusted role resolution failed: ${error.message}. Defaulting to STUDENT.`);
         return UserRole.STUDENT;
       }
 
@@ -66,22 +66,21 @@ export class AuthService implements IAuthService {
         return roleValue as UserRole;
       }
 
-      logger.warn('AuthService', `Invalid role value from DB for ${userId}: ${roleValue}. Defaulting to STUDENT.`);
+      logger.warn('AuthService', `Invalid role value from DB: ${roleValue}. Defaulting to STUDENT.`);
       return UserRole.STUDENT;
     } catch (err) {
-      logger.error('AuthService', `Trusted role resolution exception for ${userId}: ${(err as Error).message}. Defaulting to STUDENT.`);
+      logger.error('AuthService', `Trusted role resolution exception: ${(err as Error).message}. Defaulting to STUDENT.`);
       return UserRole.STUDENT;
     }
   }
 
   /**
    * Resolve a user's school_id from school_memberships.
+   * The DB function uses auth.uid() — no parameters passed from client.
    */
-  private async resolveSchoolId(userId: string): Promise<string | undefined> {
+  private async resolveSchoolId(): Promise<string | undefined> {
     try {
-      const { data, error } = await supabase.rpc('get_user_school_id', {
-        target_user_id: userId,
-      });
+      const { data, error } = await supabase.rpc('get_user_school_id');
 
       if (error || !data) {
         return undefined;
@@ -103,8 +102,8 @@ export class AuthService implements IAuthService {
     const user = session.user;
 
     // GATE 06A: Resolve trusted role from DB, NOT from user_metadata
-    const trustedRole = await this.resolveTrustedRole(user.id);
-    const schoolId = await this.resolveSchoolId(user.id);
+    const trustedRole = await this.resolveTrustedRole();
+    const schoolId = await this.resolveSchoolId();
 
     const userProfile: UserProfile = {
       id: user.id,
@@ -180,12 +179,20 @@ export class AuthService implements IAuthService {
   }
 
   /**
-   * GATE 06A: Production-safe foundation session.
+   * GATE 06A.1: Production-safe foundation session.
+   * Blocked in production. Only available in development/staging environments.
    * Creates a synthetic session for development/foundation testing only.
-   * In production, all role resolution goes through the DB.
    */
   public setFoundationSession(role: UserRole): AuthSession {
-    logger.warn('AuthService', `setFoundationSession called with role: ${role}. This is a foundation-only session — NOT production authorization.`);
+    const appEnv = envConfig.get().environment;
+
+    if (appEnv === 'production') {
+      const errorMsg = 'setFoundationSession is blocked in production. Use real Supabase authentication.';
+      logger.error('AuthService', errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    logger.warn('AuthService', `setFoundationSession called with role: ${role} in ${appEnv} mode. Foundation-only — NOT production authorization.`);
 
     const sampleUser: UserProfile = {
       id: `usr-${role.toLowerCase()}-001`,
