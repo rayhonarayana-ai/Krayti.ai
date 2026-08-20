@@ -51,8 +51,8 @@ async function runIdempotencyTests() {
 
     assert(recordedObservations.length === 1, 'First submission creates observation');
     const firstObs = recordedObservations[0];
-    // GATE 06B.1: Idempotency key now includes school segment (noschool for unauthenticated)
-    assert(firstObs.idempotencyKey === `obs_ex_${studentId}_noschool_${submissionId}`, 'idempotencyKey is derived deterministically from school + submissionId');
+    // GATE 06B.2A.1: Business-only key — Edge Function derives authoritative key from verified identity
+    assert(firstObs.idempotencyKey === `obs_ex_${submissionId}`, 'idempotencyKey is business-only (authoritative key derived server-side)');
 
     // Network Retry / UI Double Submit with DIFFERENT runtime event.id, BUT SAME submissionId
     await qaraytiEventBus.publish(QaraytiEventType.STUDENT_EXERCISE_COMPLETED, studentId, 'STUDENT', {
@@ -76,7 +76,7 @@ async function runIdempotencyTests() {
     await new Promise((r) => setTimeout(r, 50));
 
     assert(recordedObservations.length === 2, 'Genuinely new submission creates a second observation');
-    assert(recordedObservations[1].idempotencyKey === `obs_ex_${studentId}_noschool_${newSubmissionId}`, 'New submission has distinct idempotencyKey');
+    assert(recordedObservations[1].idempotencyKey === `obs_ex_${newSubmissionId}`, 'New submission has distinct idempotencyKey');
 
     // TEST F & G: Event Replay & Repository retry
     const replayRes = await observationHistoryRepo.recordObservation(recordedObservations[0]);
@@ -102,7 +102,7 @@ async function runIdempotencyTests() {
     assert(event1.id !== event2.id, 'Runtime event IDs differ between calls');
     const obsCalc = recordedObservations.find((o) => o.metadata?.submissionId === 'sub-calc-789');
     assert(obsCalc !== undefined, 'Observation created for sub-calc-789');
-    assert(obsCalc.idempotencyKey === `obs_ex_${studentId}_noschool_sub-calc-789`, 'Business idempotencyKey remained perfectly stable despite different event IDs');
+    assert(obsCalc.idempotencyKey === `obs_ex_sub-calc-789`, 'Business idempotencyKey remained perfectly stable despite different event IDs');
 
     console.log(`--- ALL ${passedTests}/${totalTests} TESTS PASSED SUCCESSFULLY ---`);
     process.exit(0);

@@ -58,18 +58,18 @@ export class SupabaseLearningObservationRepository implements ILearningObservati
           'Authorization': `Bearer ${jwt}`,
         },
         body: JSON.stringify({
+          businessKey: observation.idempotencyKey,
           conceptId: observation.conceptId,
           observationType: observation.observationType,
           evidenceSource: observation.evidenceSource,
           sourceEventId: observation.sourceEventId,
-          idempotencyKey: observation.idempotencyKey,
           previousMastery: observation.previousMastery,
           currentMastery: observation.currentMastery,
           delta: observation.delta,
           confidence: observation.confidence,
           metadata: observation.metadata || {},
           occurredAt: observation.occurredAt,
-          // NOTE: studentId and schoolId are NOT sent — derived by Edge Function from JWT + membership
+          // NOTE: studentId, schoolId, and idempotencyKey are NOT sent — derived by Edge Function from JWT + membership
         }),
       });
 

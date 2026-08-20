@@ -146,10 +146,10 @@ export class LearningEvidenceEngine {
           // P0.4: NEVER use exerciseId as conceptId — use topic if available, otherwise mark as unmapped
           const conceptId = topic || 'NO_COMPETENCY_MAPPING';
           const exerciseBusinessId = String(payload.submissionId || payload.attemptId || '');
-          // GATE 06B.1.1: Idempotency key includes resolved school_id
+          // GATE 06B.2A.1: Business-only key — Edge Function derives authoritative key from verified identity
           const exerciseIdempotencyKey = exerciseBusinessId
-            ? `obs_ex_${studentId}_${schoolId}_${exerciseBusinessId}`
-            : `obs_ex_${studentId}_${schoolId}_${exerciseId}_${event.id}`;
+            ? `obs_ex_${exerciseBusinessId}`
+            : `obs_ex_${exerciseId}_${event.id}`;
 
           await observationHistoryRepo.recordObservation({
             studentId,
@@ -224,9 +224,10 @@ export class LearningEvidenceEngine {
 
           // Persist append-only observation
           const gapBusinessId = String(payload.remediationId || payload.attemptId || payload.submissionId || '');
+          // GATE 06B.2A.1: Business-only key — Edge Function derives authoritative key from verified identity
           const gapIdempotencyKey = gapBusinessId
-            ? `obs_gap_${studentId}_${schoolId}_${conceptCode}_${gapBusinessId}`
-            : `obs_gap_${studentId}_${schoolId}_${conceptCode}_${event.id}`;
+            ? `obs_gap_${conceptCode}_${gapBusinessId}`
+            : `obs_gap_${conceptCode}_${event.id}`;
 
           await observationHistoryRepo.recordObservation({
             studentId,
@@ -280,9 +281,10 @@ export class LearningEvidenceEngine {
 
           // Persist append-only observation
           const lessonBusinessId = String(payload.completionId || payload.attemptId || payload.submissionId || '');
+          // GATE 06B.2A.1: Business-only key — Edge Function derives authoritative key from verified identity
           const lessonIdempotencyKey = lessonBusinessId
-            ? `obs_les_${studentId}_${schoolId}_${lessonId}_${lessonBusinessId}`
-            : `obs_les_${studentId}_${schoolId}_${lessonId}_${event.id}`;
+            ? `obs_les_${lessonId}_${lessonBusinessId}`
+            : `obs_les_${lessonId}_${event.id}`;
 
           await observationHistoryRepo.recordObservation({
             studentId,
@@ -349,9 +351,10 @@ export class LearningEvidenceEngine {
 
           // Persist append-only observation
           const skillBusinessId = String(payload.masteryId || payload.attemptId || payload.traceId || '');
+          // GATE 06B.2A.1: Business-only key — Edge Function derives authoritative key from verified identity
           const skillIdempotencyKey = skillBusinessId
-            ? `obs_skl_${studentId}_${schoolId}_${conceptCode}_${skillBusinessId}`
-            : `obs_skl_${studentId}_${schoolId}_${conceptCode}_${event.id}`;
+            ? `obs_skl_${conceptCode}_${skillBusinessId}`
+            : `obs_skl_${conceptCode}_${event.id}`;
 
           await observationHistoryRepo.recordObservation({
             studentId,

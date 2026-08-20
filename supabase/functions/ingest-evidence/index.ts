@@ -1,5 +1,5 @@
 /**
- * Qarayti.ai — Gate 06B.2A: Trusted Learning Evidence Ingestion Edge Function
+ * Qarayti.ai — Gate 06B.2A.1: Hardened Trusted Learning Evidence Ingestion Edge Function
  *
  * This function is the ONLY authorized path for persisting learning observations.
  * Browser clients cannot directly INSERT into learning_observation_history.
@@ -7,42 +7,62 @@
  * SECURITY INVARIANTS:
  *   1. User identity is derived from verified JWT — NOT from request payload
  *   2. School membership is verified against trusted DB state — NOT from request payload
- *   3. service_role key is NEVER exposed to the browser
- *   4. No payload.studentId or payload.schoolId is trusted as authority
+ *   3. Idempotency key is derived server-side from verified identity — NOT from client
+ *   4. service_role key is NEVER exposed to the browser
+ *   5. No payload.studentId or payload.schoolId is trusted as authority
+ *   6. Duplicate lookup scoped to verified student+school — no cross-user disclosure
+ *   7. Raw DB errors never returned to browser
  *
  * TRUST BOUNDARY:
- *   Browser → [JWT validated here] → verified user_id → school membership verified → service_role INSERT
+ *   Browser → [JWT validated here] → verified user_id → school membership verified
+ *   → authoritative idempotency key derived → service_role INSERT
  */
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
+const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 interface EvidenceIngestRequest {
+  // Business identity component — used for replay protection
+  // The Edge Function derives the full authoritative idempotency key
+  // using verified user + school identity + this business key.
+  businessKey: string;
   // Observation fields — these are the CLAIMS the browser is making
   conceptId: string;
   observationType: string;
   evidenceSource: string;
   sourceEventId: string;
-  idempotencyKey: string;
   previousMastery: number | null;
   currentMastery: number;
   delta: number | null;
   confidence: number;
   metadata: Record<string, unknown>;
   occurredAt: string;
-  // NOTE: studentId and schoolId are NOT accepted from the request body.
+  // NOTE: studentId, schoolId, and idempotencyKey are NOT accepted from the request body.
   // They are derived from verified JWT and school membership check.
 }
 
+function jsonError(message: string, status: number, headers: Record<string, string> = corsHeaders): Response {
+  return new Response(
+    JSON.stringify({ error: message }),
+    { status, headers: { ...headers, "Content-Type": "application/json" } }
+  );
+}
+
 serve(async (req: Request) => {
-  // Handle CORS preflight
+  // ============================================================
+  // METHOD BOUNDARY: POST and OPTIONS only
+  // ============================================================
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
+  }
+
+  if (req.method !== "POST") {
+    return jsonError("Method not allowed", 405);
   }
 
   try {
@@ -51,15 +71,11 @@ serve(async (req: Request) => {
     // ============================================================
     const authHeader = req.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return new Response(
-        JSON.stringify({ error: "Missing or invalid Authorization header" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonError("Unauthorized", 401);
     }
 
     const jwt = authHeader.replace("Bearer ", "");
 
-    // Create a Supabase client with the JWT to verify the user
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
@@ -67,14 +83,10 @@ serve(async (req: Request) => {
       global: { headers: { Authorization: `Bearer ${jwt}` } },
     });
 
-    // Verify JWT and extract user identity
     const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
 
     if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Invalid or expired JWT" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonError("Unauthorized", 401);
     }
 
     const verifiedUserId = user.id;
@@ -84,37 +96,22 @@ serve(async (req: Request) => {
     // ============================================================
     const body: EvidenceIngestRequest = await req.json();
 
-    // Validate required fields
-    if (!body.conceptId || !body.observationType || !body.idempotencyKey || !body.occurredAt) {
-      return new Response(
-        JSON.stringify({ error: "Missing required fields: conceptId, observationType, idempotencyKey, occurredAt" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!body.businessKey || !body.conceptId || !body.observationType || !body.occurredAt) {
+      return jsonError("Bad request", 400);
     }
 
     // ============================================================
     // 3. Verify school membership against trusted DB state
     // ============================================================
-    // The browser may claim a schoolId in metadata, but we must verify
-    // the user actually has a STUDENT membership for that school.
-    //
-    // For this gate, we accept schoolId from metadata.schoolId (if provided)
-    // and verify it against school_memberships. If not provided, we look up
-    // the user's single STUDENT membership.
-    //
-    // FUTURE: This is where Gate 06B.2B+ validations will be inserted.
-
     const claimedSchoolId = body.metadata?.schoolId as string | undefined;
 
-    // Use service_role client for DB queries (bypasses RLS)
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     let verifiedSchoolId: string | null = null;
 
     if (claimedSchoolId) {
-      // Verify the claimed school membership exists
-      const { data: membership, error: membershipError } = await supabaseAdmin
+      const { data: membership } = await supabaseAdmin
         .from("school_memberships")
         .select("school_id")
         .eq("user_id", verifiedUserId)
@@ -122,63 +119,49 @@ serve(async (req: Request) => {
         .eq("role", "STUDENT")
         .maybeSingle();
 
-      if (membershipError || !membership) {
-        return new Response(
-          JSON.stringify({ error: "School membership verification failed" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      if (!membership) {
+        return jsonError("Forbidden", 403);
       }
 
       verifiedSchoolId = membership.school_id;
     } else {
-      // No schoolId claimed — look up the user's single STUDENT membership
-      const { data: memberships, error: listError } = await supabaseAdmin
+      const { data: memberships } = await supabaseAdmin
         .from("school_memberships")
         .select("school_id")
         .eq("user_id", verifiedUserId)
         .eq("role", "STUDENT");
 
-      if (listError) {
-        return new Response(
-          JSON.stringify({ error: "Failed to query school memberships" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
       if (!memberships || memberships.length === 0) {
-        // No school membership — evidence blocked (fail-closed)
-        return new Response(
-          JSON.stringify({ error: "No STUDENT school membership found" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return jsonError("Forbidden", 403);
       }
 
       if (memberships.length > 1) {
-        // Multiple school memberships — cannot determine which school without explicit claim
-        return new Response(
-          JSON.stringify({ error: "Multiple school memberships — schoolId must be specified in metadata" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return jsonError("Forbidden", 403);
       }
 
       verifiedSchoolId = memberships[0].school_id;
     }
 
     // ============================================================
-    // 4. Insert observation using service_role (RLS bypassed)
+    // 4. Derive authoritative idempotency key (server-side only)
     // ============================================================
-    // studentId is ALWAYS derived from verified JWT — never from payload
-    // schoolId is ALWAYS derived from verified school membership — never from payload
+    // Client provides only the business identity component.
+    // The Edge Function derives the full key using verified identity.
+    // This ensures the key is ALWAYS bound to the verified student+school.
+    const authoritativeKey = `${verifiedUserId}_${verifiedSchoolId}_${body.observationType}_${body.businessKey}`;
 
+    // ============================================================
+    // 5. Insert observation using service_role (RLS bypassed)
+    // ============================================================
     const dbRecord = {
-      student_id: verifiedUserId,                    // FROM VERIFIED JWT
-      school_id: verifiedSchoolId,                   // FROM VERIFIED MEMBERSHIP
-      tenant_id: "default",                          // Default tenant
+      student_id: verifiedUserId,
+      school_id: verifiedSchoolId,
+      tenant_id: "default",
       concept_id: body.conceptId,
       observation_type: body.observationType,
       evidence_source: body.evidenceSource,
       source_event_id: body.sourceEventId,
-      idempotency_key: body.idempotencyKey,
+      idempotency_key: authoritativeKey,
       previous_mastery: body.previousMastery,
       current_mastery: body.currentMastery,
       delta: body.delta,
@@ -195,12 +178,14 @@ serve(async (req: Request) => {
 
     if (insertError) {
       // Handle idempotency key violation (PostgreSQL 23505)
-      if (insertError.code === "23505" || insertError.message.includes("unique constraint")) {
-        // Duplicate — fetch existing observation
+      if (insertError.code === "23505") {
+        // Duplicate — scoped to verified student+school
         const { data: existing } = await supabaseAdmin
           .from("learning_observation_history")
           .select("id")
-          .eq("idempotency_key", body.idempotencyKey)
+          .eq("idempotency_key", authoritativeKey)
+          .eq("student_id", verifiedUserId)
+          .eq("school_id", verifiedSchoolId)
           .maybeSingle();
 
         return new Response(
@@ -209,10 +194,9 @@ serve(async (req: Request) => {
         );
       }
 
-      return new Response(
-        JSON.stringify({ error: `Insert failed: ${insertError.message}` }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      // Log server-side, return generic error
+      console.error(`[INGEST_EVIDENCE] Insert failed: ${insertError.message}`);
+      return jsonError("Evidence persistence failed", 500);
     }
 
     return new Response(
@@ -221,9 +205,7 @@ serve(async (req: Request) => {
     );
 
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: `Internal error: ${err.message}` }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    console.error(`[INGEST_EVIDENCE] Internal error: ${err.message}`);
+    return jsonError("Evidence persistence failed", 500);
   }
 });
