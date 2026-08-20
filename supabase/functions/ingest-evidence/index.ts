@@ -1,8 +1,16 @@
 /**
- * Qarayti.ai — Gate 06B.2A.1: Hardened Trusted Learning Evidence Ingestion Edge Function
+ * Qarayti.ai — Gate 06B.2B.2: Trusted Exercise Verification Edge Function
  *
  * This function is the ONLY authorized path for persisting learning observations.
  * Browser clients cannot directly INSERT into learning_observation_history.
+ *
+ * TRUST BOUNDARY (exercise path):
+ *   Browser submits raw interaction facts → Edge validates JWT → verifies school membership
+ *   → resolves canonical exercise → derives curriculum identity → grades server-side
+ *   → constructs authoritative observation → service_role INSERT
+ *
+ * TRUST BOUNDARY (non-exercise path):
+ *   Existing Gate 06B.2A.1 behavior for LESSON_FINISHED, ADAPTIVE_GAP_REMEDIATED, etc.
  *
  * SECURITY INVARIANTS:
  *   1. User identity is derived from verified JWT — NOT from request payload
@@ -10,12 +18,11 @@
  *   3. Idempotency key is derived server-side from verified identity — NOT from client
  *   4. service_role key is NEVER exposed to the browser
  *   5. No payload.studentId or payload.schoolId is trusted as authority
- *   6. Duplicate lookup scoped to verified student+school — no cross-user disclosure
- *   7. Raw DB errors never returned to browser
- *
- * TRUST BOUNDARY:
- *   Browser → [JWT validated here] → verified user_id → school membership verified
- *   → authoritative idempotency key derived → service_role INSERT
+ *   6. For exercises: conceptId, KO, competency, subject, isCorrect all derived server-side
+ *   7. Client isCorrect is NEVER accepted — grading is server-side only
+ *   8. Unresolved exercises (ko_id IS NULL) fail closed for authoritative evidence
+ *   9. Non-deterministic grading modes fail closed
+ *  10. NO_COMPETENCY_MAPPING is never generated for verified exercise interactions
  */
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
@@ -26,12 +33,24 @@ const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface EvidenceIngestRequest {
-  // Business identity component — used for replay protection
-  // The Edge Function derives the full authoritative idempotency key
-  // using verified user + school identity + this business key.
+// ============================================================
+// EXERCISE VERIFICATION CONTRACT (Gate 06B.2B.2)
+// Browser sends ONLY raw interaction facts.
+// Everything else is derived server-side.
+// ============================================================
+interface ExerciseEvidenceRequest {
+  exerciseCode: string;    // canonical exercise code (public identifier)
+  answer: string;          // student's answer (raw text)
+  submissionId: string;    // for idempotency (business key)
+  schoolId?: string;       // optional claimed school
+}
+
+// ============================================================
+// NON-EXERCISE CONTRACT (Gate 06B.2A.1 — existing behavior)
+// For LESSON_FINISHED, ADAPTIVE_GAP_REMEDIATED, ADAPTIVE_SKILL_MASTERED
+// ============================================================
+interface LegacyEvidenceRequest {
   businessKey: string;
-  // Observation fields — these are the CLAIMS the browser is making
   conceptId: string;
   observationType: string;
   evidenceSource: string;
@@ -42,8 +61,6 @@ interface EvidenceIngestRequest {
   confidence: number;
   metadata: Record<string, unknown>;
   occurredAt: string;
-  // NOTE: studentId, schoolId, and idempotencyKey are NOT accepted from the request body.
-  // They are derived from verified JWT and school membership check.
 }
 
 function jsonError(message: string, status: number, headers: Record<string, string> = corsHeaders): Response {
@@ -54,9 +71,6 @@ function jsonError(message: string, status: number, headers: Record<string, stri
 }
 
 serve(async (req: Request) => {
-  // ============================================================
-  // METHOD BOUNDARY: POST and OPTIONS only
-  // ============================================================
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -92,21 +106,16 @@ serve(async (req: Request) => {
     const verifiedUserId = user.id;
 
     // ============================================================
-    // 2. Parse request body
+    // 2. Parse request body and determine path
     // ============================================================
-    const body: EvidenceIngestRequest = await req.json();
-
-    if (!body.businessKey || !body.conceptId || !body.observationType || !body.occurredAt) {
-      return jsonError("Bad request", 400);
-    }
-
-    // ============================================================
-    // 3. Verify school membership against trusted DB state
-    // ============================================================
-    const claimedSchoolId = body.metadata?.schoolId as string | undefined;
-
+    const body = await req.json();
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+    // ============================================================
+    // 3. Verify school membership (shared by both paths)
+    // ============================================================
+    const claimedSchoolId = body.schoolId || body.metadata?.schoolId as string | undefined;
 
     let verifiedSchoolId: string | null = null;
 
@@ -143,69 +152,305 @@ serve(async (req: Request) => {
     }
 
     // ============================================================
-    // 4. Derive authoritative idempotency key (server-side only)
+    // 4. ROUTE: Exercise Verification Path (Gate 06B.2B.2)
     // ============================================================
-    // Client provides only the business identity component.
-    // The Edge Function derives the full key using verified identity.
-    // This ensures the key is ALWAYS bound to the verified student+school.
-    const authoritativeKey = `${verifiedUserId}_${verifiedSchoolId}_${body.observationType}_${body.businessKey}`;
-
-    // ============================================================
-    // 5. Insert observation using service_role (RLS bypassed)
-    // ============================================================
-    const dbRecord = {
-      student_id: verifiedUserId,
-      school_id: verifiedSchoolId,
-      tenant_id: "default",
-      concept_id: body.conceptId,
-      observation_type: body.observationType,
-      evidence_source: body.evidenceSource,
-      source_event_id: body.sourceEventId,
-      idempotency_key: authoritativeKey,
-      previous_mastery: body.previousMastery,
-      current_mastery: body.currentMastery,
-      delta: body.delta,
-      confidence: body.confidence ?? 1.0,
-      metadata: body.metadata || {},
-      occurred_at: body.occurredAt,
-    };
-
-    const { data, error: insertError } = await supabaseAdmin
-      .from("learning_observation_history")
-      .insert(dbRecord)
-      .select("id")
-      .single();
-
-    if (insertError) {
-      // Handle idempotency key violation (PostgreSQL 23505)
-      if (insertError.code === "23505") {
-        // Duplicate — scoped to verified student+school
-        const { data: existing } = await supabaseAdmin
-          .from("learning_observation_history")
-          .select("id")
-          .eq("idempotency_key", authoritativeKey)
-          .eq("student_id", verifiedUserId)
-          .eq("school_id", verifiedSchoolId)
-          .maybeSingle();
-
-        return new Response(
-          JSON.stringify({ success: true, id: existing?.id, duplicate: true }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Log server-side, return generic error
-      console.error(`[INGEST_EVIDENCE] Insert failed: ${insertError.message}`);
-      return jsonError("Evidence persistence failed", 500);
+    if (body.exerciseCode && typeof body.exerciseCode === "string") {
+      return await handleExerciseVerification({
+        supabaseAdmin,
+        verifiedUserId,
+        verifiedSchoolId,
+        exerciseCode: body.exerciseCode,
+        answer: typeof body.answer === "string" ? body.answer : "",
+        submissionId: typeof body.submissionId === "string" ? body.submissionId : "",
+      });
     }
 
-    return new Response(
-      JSON.stringify({ success: true, id: data?.id, duplicate: false }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    // ============================================================
+    // 5. ROUTE: Legacy Non-Exercise Path (Gate 06B.2A.1)
+    // ============================================================
+    return await handleLegacyEvidence({
+      supabaseAdmin,
+      verifiedUserId,
+      verifiedSchoolId,
+      body,
+    });
 
   } catch (err) {
     console.error(`[INGEST_EVIDENCE] Internal error: ${err.message}`);
     return jsonError("Evidence persistence failed", 500);
   }
 });
+
+// ============================================================
+// EXERCISE VERIFICATION PATH (Gate 06B.2B.2)
+// ============================================================
+async function handleExerciseVerification(params: {
+  supabaseAdmin: ReturnType<typeof createClient>;
+  verifiedUserId: string;
+  verifiedSchoolId: string | null;
+  exerciseCode: string;
+  answer: string;
+  submissionId: string;
+}): Promise<Response> {
+  const { supabaseAdmin, verifiedUserId, verifiedSchoolId, exerciseCode, answer, submissionId } = params;
+
+  // ----------------------------------------------------------
+  // 4a. Resolve canonical exercise from registry
+  // ----------------------------------------------------------
+  const { data: exercise, error: exerciseError } = await supabaseAdmin
+    .from("curriculum_exercises")
+    .select("id, code, subject_id, ko_id, exercise_type, prompt, grading_type, is_active")
+    .eq("code", exerciseCode)
+    .maybeSingle();
+
+  if (exerciseError || !exercise) {
+    console.error(`[INGEST_EVIDENCE] Exercise not found: ${exerciseCode}`);
+    return jsonError("Exercise not found in canonical registry", 422);
+  }
+
+  if (!exercise.is_active) {
+    return jsonError("Exercise is not active", 422);
+  }
+
+  // ----------------------------------------------------------
+  // 4b. Fail closed: unresolved exercise (no KO mapping)
+  // ----------------------------------------------------------
+  if (!exercise.ko_id) {
+    console.error(`[INGEST_EVIDENCE] Exercise has no KO mapping: ${exerciseCode}`);
+    return jsonError("Exercise not yet mapped to curriculum — authoritative evidence unavailable", 422);
+  }
+
+  // ----------------------------------------------------------
+  // 4c. Resolve KO → Subject
+  // ----------------------------------------------------------
+  const { data: ko, error: koError } = await supabaseAdmin
+    .from("curriculum_knowledge_objects")
+    .select("id, code, title, subject_id, curriculum_subjects!inner(code, title)")
+    .eq("id", exercise.ko_id)
+    .maybeSingle();
+
+  if (koError || !ko) {
+    console.error(`[INGEST_EVIDENCE] KO not found for exercise: ${exerciseCode}`);
+    return jsonError("Curriculum derivation failed", 500);
+  }
+
+  // ----------------------------------------------------------
+  // 4d. Resolve KO → Competencies
+  // ----------------------------------------------------------
+  const { data: koCompetencies } = await supabaseAdmin
+    .from("curriculum_ko_competencies")
+    .select("curriculum_competencies!inner(code, title)")
+    .eq("ko_id", exercise.ko_id);
+
+  const competencyList = (koCompetencies || []).map(
+    (kc: any) => ({ code: kc.curriculum_competencies.code, title: kc.curriculum_competencies.title })
+  );
+
+  // ----------------------------------------------------------
+  // 4e. Resolve grading authority
+  // ----------------------------------------------------------
+  const { data: grading, error: gradingError } = await supabaseAdmin
+    .from("curriculum_exercise_grading")
+    .select("exercise_id, correct_answer, rubric_criteria")
+    .eq("exercise_id", exercise.id)
+    .maybeSingle();
+
+  if (gradingError || !grading) {
+    console.error(`[INGEST_EVIDENCE] Grading authority missing for exercise: ${exerciseCode}`);
+    return jsonError("Grading authority missing — evidence cannot be verified", 500);
+  }
+
+  // ----------------------------------------------------------
+  // 4f. Fail closed: non-deterministic grading modes
+  // ----------------------------------------------------------
+  if (exercise.grading_type === "RUBRIC" || exercise.grading_type === "OPEN_ENDED") {
+    console.error(`[INGEST_EVIDENCE] Non-deterministic grading mode: ${exercise.grading_type} for ${exerciseCode}`);
+    return jsonError("Exercise requires non-deterministic grading — authoritative evidence unavailable", 422);
+  }
+
+  if (!grading.correct_answer && grading.correct_answer !== "") {
+    console.error(`[INGEST_EVIDENCE] No correct answer in grading authority: ${exerciseCode}`);
+    return jsonError("Grading authority incomplete — evidence cannot be verified", 422);
+  }
+
+  // ----------------------------------------------------------
+  // 4g. Server-side grading (EXACT_ANSWER only)
+  // ----------------------------------------------------------
+  const normalizedAnswer = answer.trim().toLowerCase();
+  const normalizedCorrect = grading.correct_answer.trim().toLowerCase();
+  const isCorrect = normalizedAnswer === normalizedCorrect;
+
+  // ----------------------------------------------------------
+  // 4h. CURRICULUM_DATA_QUALITY_WARNING for q-math-002
+  // ----------------------------------------------------------
+  const dataQualityWarning = exerciseCode === "q-math-002"
+    ? "CURRICULUM_DATA_QUALITY_WARNING: Exercise content (complex numbers) does not match mapped KO (dichotomy). Semantic correctness unverified."
+    : undefined;
+
+  // ----------------------------------------------------------
+  // 4i. Construct authoritative observation
+  // ----------------------------------------------------------
+  const conceptId = ko.code;
+  const subjectCode = (ko as any).curriculum_subjects?.code || "UNKNOWN";
+  const exerciseBusinessId = submissionId || `exercise-${exerciseCode}-${Date.now()}`;
+  const authoritativeKey = `${verifiedUserId}_${verifiedSchoolId}_EXERCISE_COMPLETION_${exerciseBusinessId}`;
+
+  const metadata: Record<string, unknown> = {
+    exerciseCode: exercise.code,
+    exerciseType: exercise.exercise_type,
+    gradingType: exercise.grading_type,
+    subjectCode,
+    koCode: ko.code,
+    koTitle: ko.title,
+    competencyCodes: competencyList.map((c) => c.code),
+    isCorrect,
+    serverGraded: true,
+    evidenceSource: "TRUSTED_SERVER",
+  };
+
+  if (dataQualityWarning) {
+    metadata.dataQualityWarning = dataQualityWarning;
+  }
+
+  const dbRecord = {
+    student_id: verifiedUserId,
+    school_id: verifiedSchoolId,
+    tenant_id: "default",
+    concept_id: conceptId,
+    observation_type: "EXERCISE_COMPLETION",
+    evidence_source: "TRUSTED_SERVER",
+    source_event_id: `exercise-verify-${exerciseCode}-${Date.now()}`,
+    idempotency_key: authoritativeKey,
+    previous_mastery: null,
+    current_mastery: isCorrect ? 1.0 : 0.0,
+    delta: null,
+    confidence: 1.0,
+    metadata,
+    occurred_at: new Date().toISOString(),
+  };
+
+  // ----------------------------------------------------------
+  // 4j. Insert via service_role (RLS bypassed)
+  // ----------------------------------------------------------
+  const { data, error: insertError } = await supabaseAdmin
+    .from("learning_observation_history")
+    .insert(dbRecord)
+    .select("id")
+    .single();
+
+  if (insertError) {
+    if (insertError.code === "23505") {
+      const { data: existing } = await supabaseAdmin
+        .from("learning_observation_history")
+        .select("id")
+        .eq("idempotency_key", authoritativeKey)
+        .eq("student_id", verifiedUserId)
+        .eq("school_id", verifiedSchoolId)
+        .maybeSingle();
+
+      return new Response(
+        JSON.stringify({ success: true, id: existing?.id, duplicate: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.error(`[INGEST_EVIDENCE] Insert failed: ${insertError.message}`);
+    return jsonError("Evidence persistence failed", 500);
+  }
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      id: data?.id,
+      duplicate: false,
+      verified: {
+        exerciseCode: exercise.code,
+        subjectCode,
+        koCode: ko.code,
+        competencies: competencyList.map((c) => c.code),
+        isCorrect,
+        gradedBy: "TRUSTED_SERVER",
+      },
+      ...(dataQualityWarning ? { dataQualityWarning } : {}),
+    }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+// ============================================================
+// LEGACY NON-EXERCISE PATH (Gate 06B.2A.1 — unchanged)
+// ============================================================
+async function handleLegacyEvidence(params: {
+  supabaseAdmin: ReturnType<typeof createClient>;
+  verifiedUserId: string;
+  verifiedSchoolId: string | null;
+  body: Record<string, unknown>;
+}): Promise<Response> {
+  const { supabaseAdmin, verifiedUserId, verifiedSchoolId, body } = params;
+
+  const businessKey = body.businessKey as string;
+  const conceptId = body.conceptId as string;
+  const observationType = body.observationType as string;
+  const evidenceSource = body.evidenceSource as string;
+  const sourceEventId = body.sourceEventId as string;
+  const previousMastery = body.previousMastery as number | null;
+  const currentMastery = body.currentMastery as number;
+  const delta = body.delta as number | null;
+  const confidence = (body.confidence as number) ?? 1.0;
+  const metadata = (body.metadata as Record<string, unknown>) || {};
+  const occurredAt = body.occurredAt as string;
+
+  if (!businessKey || !conceptId || !observationType || !occurredAt) {
+    return jsonError("Bad request", 400);
+  }
+
+  const authoritativeKey = `${verifiedUserId}_${verifiedSchoolId}_${observationType}_${businessKey}`;
+
+  const dbRecord = {
+    student_id: verifiedUserId,
+    school_id: verifiedSchoolId,
+    tenant_id: "default",
+    concept_id: conceptId,
+    observation_type: observationType,
+    evidence_source: evidenceSource,
+    source_event_id: sourceEventId,
+    idempotency_key: authoritativeKey,
+    previous_mastery: previousMastery,
+    current_mastery: currentMastery,
+    delta,
+    confidence,
+    metadata,
+    occurred_at: occurredAt,
+  };
+
+  const { data, error: insertError } = await supabaseAdmin
+    .from("learning_observation_history")
+    .insert(dbRecord)
+    .select("id")
+    .single();
+
+  if (insertError) {
+    if (insertError.code === "23505") {
+      const { data: existing } = await supabaseAdmin
+        .from("learning_observation_history")
+        .select("id")
+        .eq("idempotency_key", authoritativeKey)
+        .eq("student_id", verifiedUserId)
+        .eq("school_id", verifiedSchoolId)
+        .maybeSingle();
+
+      return new Response(
+        JSON.stringify({ success: true, id: existing?.id, duplicate: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.error(`[INGEST_EVIDENCE] Insert failed: ${insertError.message}`);
+    return jsonError("Evidence persistence failed", 500);
+  }
+
+  return new Response(
+    JSON.stringify({ success: true, id: data?.id, duplicate: false }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}

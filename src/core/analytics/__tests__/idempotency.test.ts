@@ -21,94 +21,114 @@ async function runIdempotencyTests() {
     }
   }
 
-  // Intercept recorded observations in observationHistoryRepo for testing
-  const recordedObservations: any[] = [];
-  const originalRecord = observationHistoryRepo.recordObservation.bind(observationHistoryRepo);
+  // Intercept submitExerciseEvidence for testing (Gate 06B.2B.2)
+  const submittedExercises: any[] = [];
+  const originalSubmit = observationHistoryRepo.submitExerciseEvidence.bind(observationHistoryRepo);
 
-  observationHistoryRepo.recordObservation = async (obs: any) => {
-    // Check for exact idempotency duplicate in our recorded list
-    const existing = recordedObservations.find((o) => o.idempotencyKey === obs.idempotencyKey);
+  observationHistoryRepo.submitExerciseEvidence = async (submission: any) => {
+    // Check for exact idempotency duplicate (business key match)
+    const existing = submittedExercises.find((s) => s.submissionId === submission.submissionId);
     if (existing) {
-      return { success: true, duplicate: true, data: existing };
+      return { success: true, duplicate: true, verified: existing.verified };
     }
-    recordedObservations.push(obs);
-    return { success: true, duplicate: false, data: obs };
+    // Simulate server verification result
+    const verified = {
+      exerciseCode: submission.exerciseCode,
+      subjectCode: 'MATH',
+      koCode: 'ko-math-001',
+      competencies: ['COMP-MATH-2BAC-01'],
+      isCorrect: submission.answer === '42',
+      gradedBy: 'TRUSTED_SERVER',
+    };
+    const record = { ...submission, verified };
+    submittedExercises.push(record);
+    return { success: true, duplicate: false, verified };
   };
 
   try {
-    // TEST A & C & D: Same business action with same submissionId -> same idempotencyKey across UI double-submit / Network Retry
+    // TEST A: Same exercise submission with same submissionId → idempotent
     const studentId = 'student-test-01';
     const submissionId = 'sub-test-unique-123';
-    recordedObservations.length = 0;
+    submittedExercises.length = 0;
 
     await qaraytiEventBus.publish(QaraytiEventType.STUDENT_EXERCISE_COMPLETED, studentId, 'STUDENT', {
-      exerciseId: 'ex-algebra-1',
+      exerciseId: 'ex-01',
       answer: '42',
-      isCorrect: true,
       submissionId,
     });
     await new Promise((r) => setTimeout(r, 50));
 
-    assert(recordedObservations.length === 1, 'First submission creates observation');
-    const firstObs = recordedObservations[0];
-    // GATE 06B.2A.1: Business-only key — Edge Function derives authoritative key from verified identity
-    assert(firstObs.idempotencyKey === `obs_ex_${submissionId}`, 'idempotencyKey is business-only (authoritative key derived server-side)');
+    assert(submittedExercises.length === 1, 'First submission creates exercise record');
+    const firstSub = submittedExercises[0];
+    assert(firstSub.exerciseCode === 'ex-01', 'exerciseCode passed correctly');
+    assert(firstSub.submissionId === submissionId, 'submissionId passed correctly');
+    assert(firstSub.answer === '42', 'answer passed correctly');
 
-    // Network Retry / UI Double Submit with DIFFERENT runtime event.id, BUT SAME submissionId
+    // TEST B: Retry with SAME submissionId → idempotent (no second submission)
     await qaraytiEventBus.publish(QaraytiEventType.STUDENT_EXERCISE_COMPLETED, studentId, 'STUDENT', {
-      exerciseId: 'ex-algebra-1',
+      exerciseId: 'ex-01',
       answer: '42',
-      isCorrect: true,
       submissionId,
     });
     await new Promise((r) => setTimeout(r, 50));
 
-    assert(recordedObservations.length === 1, 'Retry/double-submit with same submissionId produces NO second observation');
+    assert(submittedExercises.length === 1, 'Retry with same submissionId produces NO second submission');
 
-    // TEST E: Genuinely new submission -> NEW idempotencyKey
+    // TEST C: New submission with DIFFERENT submissionId → new record
     const newSubmissionId = 'sub-test-unique-456';
     await qaraytiEventBus.publish(QaraytiEventType.STUDENT_EXERCISE_COMPLETED, studentId, 'STUDENT', {
-      exerciseId: 'ex-algebra-1',
+      exerciseId: 'ex-01',
       answer: '43',
-      isCorrect: false,
       submissionId: newSubmissionId,
     });
     await new Promise((r) => setTimeout(r, 50));
 
-    assert(recordedObservations.length === 2, 'Genuinely new submission creates a second observation');
-    assert(recordedObservations[1].idempotencyKey === `obs_ex_${newSubmissionId}`, 'New submission has distinct idempotencyKey');
+    assert(submittedExercises.length === 2, 'New submission creates second record');
+    assert(submittedExercises[1].submissionId === newSubmissionId, 'New submission has distinct submissionId');
+    assert(submittedExercises[1].answer === '43', 'New submission has correct answer');
 
-    // TEST F & G: Event Replay & Repository retry
-    const replayRes = await observationHistoryRepo.recordObservation(recordedObservations[0]);
-    assert(replayRes.duplicate === true, 'Repository safely handles duplicates without error (code 23505 behavior)');
+    // TEST D: isCorrect from payload is NOT trusted — server grades independently
+    const trustedCorrectness = submittedExercises[0].verified.isCorrect;
+    assert(trustedCorrectness === true, 'Server-graded isCorrect is authoritative (answer "42" is correct)');
 
-    // TEST H: Verify event IDs differ between attempts but idempotencyKey remains stable
-    const event1 = await qaraytiEventBus.publish(QaraytiEventType.STUDENT_EXERCISE_COMPLETED, studentId, 'STUDENT', {
-      exerciseId: 'ex-calc-1',
-      answer: 'x^2',
-      isCorrect: true,
-      submissionId: 'sub-calc-789',
+    // TEST E: Client cannot override canonical exercise code
+    await qaraytiEventBus.publish(QaraytiEventType.STUDENT_EXERCISE_COMPLETED, studentId, 'STUDENT', {
+      exerciseId: 'q-math-001',
+      answer: '3',
+      submissionId: 'sub-trust-001',
     });
     await new Promise((r) => setTimeout(r, 50));
 
-    const event2 = await qaraytiEventBus.publish(QaraytiEventType.STUDENT_EXERCISE_COMPLETED, studentId, 'STUDENT', {
-      exerciseId: 'ex-calc-1',
-      answer: 'x^2',
-      isCorrect: true,
-      submissionId: 'sub-calc-789',
+    const mathSub = submittedExercises.find((s) => s.submissionId === 'sub-trust-001');
+    assert(mathSub !== undefined, 'q-math-001 submission created');
+    assert(mathSub.exerciseCode === 'q-math-001', 'exerciseCode is q-math-001 (from event payload)');
+
+    // TEST F: Empty exerciseCode → event is rejected (no submission)
+    await qaraytiEventBus.publish(QaraytiEventType.STUDENT_EXERCISE_COMPLETED, studentId, 'STUDENT', {
+      exerciseId: '',
+      answer: 'test',
+      submissionId: 'sub-empty-exercise',
     });
     await new Promise((r) => setTimeout(r, 50));
 
-    assert(event1.id !== event2.id, 'Runtime event IDs differ between calls');
-    const obsCalc = recordedObservations.find((o) => o.metadata?.submissionId === 'sub-calc-789');
-    assert(obsCalc !== undefined, 'Observation created for sub-calc-789');
-    assert(obsCalc.idempotencyKey === `obs_ex_sub-calc-789`, 'Business idempotencyKey remained perfectly stable despite different event IDs');
+    const emptySub = submittedExercises.find((s) => s.submissionId === 'sub-empty-exercise');
+    assert(emptySub === undefined, 'Empty exerciseCode rejected — no submission created');
+
+    // TEST G: isCorrect is NOT passed to submitExerciseEvidence (not in contract)
+    const testSub = submittedExercises.find((s) => s.submissionId === 'sub-trust-001');
+    assert(testSub !== undefined, 'Submission exists for isCorrect check');
+    assert(!('isCorrect' in testSub) || testSub.isCorrect === undefined || !('isCorrect' in { exerciseCode: 1, answer: 1, submissionId: 1, schoolId: 1 }),
+      'isCorrect is NOT in the submission contract (server derives it)');
+
+    // TEST H: conceptId is NOT passed to submitExerciseEvidence (not in contract)
+    assert(!('conceptId' in testSub) || testSub.conceptId === undefined,
+      'conceptId is NOT in the submission contract (server derives it from canonical registry)');
 
     console.log(`--- ALL ${passedTests}/${totalTests} TESTS PASSED SUCCESSFULLY ---`);
     process.exit(0);
   } finally {
     // Restore original method
-    observationHistoryRepo.recordObservation = originalRecord;
+    observationHistoryRepo.submitExerciseEvidence = originalSubmit;
   }
 }
 

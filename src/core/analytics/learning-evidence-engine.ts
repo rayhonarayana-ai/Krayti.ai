@@ -113,7 +113,9 @@ export class LearningEvidenceEngine {
   }
 
   private registerEventBusListeners(): void {
-    // 1. STUDENT_EXERCISE_COMPLETED
+    // 1. STUDENT_EXERCISE_COMPLETED (Gate 06B.2B.2: Trusted Exercise Verification)
+    // Browser sends ONLY: exerciseCode, answer, submissionId, schoolId?
+    // Edge Function resolves canonical exercise, derives curriculum, grades server-side.
     const unsubExercise = qaraytiEventBus.subscribe(
       QaraytiEventType.STUDENT_EXERCISE_COMPLETED,
       async (event) => {
@@ -136,37 +138,35 @@ export class LearningEvidenceEngine {
           }
           const schoolId = schoolContext.schoolId;
 
-          const isCorrect = Boolean(payload.isCorrect);
-          const exerciseId = String(payload.exerciseId || 'exercise-unknown');
-          const topic = payload.topic ? String(payload.topic) : undefined;
+          // GATE 06B.2B.2: Extract ONLY raw interaction facts from untrusted event
+          // Do NOT trust: isCorrect, conceptId, topic, mastery, subject, competency
+          const exerciseCode = String(payload.exerciseId || payload.exerciseCode || '');
+          const answer = payload.answer !== undefined ? String(payload.answer) : '';
+          const submissionId = String(payload.submissionId || payload.attemptId || event.id);
 
-          this.recordExerciseEvent(studentId, exerciseId, isCorrect, topic);
+          if (!exerciseCode) {
+            logger.warn('LearningEvidenceEngine', 'Exercise event missing exerciseCode — evidence not persisted');
+            return;
+          }
 
-          // Persist append-only observation
-          // P0.4: NEVER use exerciseId as conceptId — use topic if available, otherwise mark as unmapped
-          const conceptId = topic || 'NO_COMPETENCY_MAPPING';
-          const exerciseBusinessId = String(payload.submissionId || payload.attemptId || '');
-          // GATE 06B.2A.1: Business-only key — Edge Function derives authoritative key from verified identity
-          const exerciseIdempotencyKey = exerciseBusinessId
-            ? `obs_ex_${exerciseBusinessId}`
-            : `obs_ex_${exerciseId}_${event.id}`;
+          // GATE 06B.2B.2: Submit raw interaction to trusted Edge Function
+          // Edge Function resolves canonical exercise, derives curriculum, grades server-side
+          const result = await observationHistoryRepo.submitExerciseEvidence({
+            exerciseCode,
+            answer,
+            submissionId,
+            schoolId: schoolId || undefined,
+          });
 
-          await observationHistoryRepo.recordObservation({
-            studentId,
-            tenantId: event.schoolId || 'default',
-            schoolId,
-            conceptId,
-            observationType: 'EXERCISE_COMPLETION',
-            evidenceSource: 'QaraytiEventBus',
-            sourceEventId: event.id,
-            idempotencyKey: exerciseIdempotencyKey,
-            previousMastery: null,
-            currentMastery: isCorrect ? 1.0 : 0.0,
-            delta: null,
-            confidence: 1.0,
-            metadata: { exerciseId, isCorrect, topic, correlationId: event.correlationId, submissionId: exerciseBusinessId || undefined },
-            occurredAt: event.timestamp || new Date().toISOString(),
-          }).catch((err) => logger.error('LearningEvidenceEngine', `Observation persistence error: ${err.message}`));
+          if (result.success && result.verified) {
+            // Record in-memory tracker with SERVER-VERIFIED correctness
+            this.recordExerciseEvent(studentId, exerciseCode, result.verified.isCorrect, undefined);
+            logger.info('LearningEvidenceEngine', `Exercise verified: ${exerciseCode} → correct=${result.verified.isCorrect}, KO=${result.verified.koCode}`);
+          } else if (result.success) {
+            // Edge Function accepted but no verification details (legacy path)
+            this.recordExerciseEvent(studentId, exerciseCode, false, undefined);
+          }
+          // If not successful, exercise was not persisted — evidence engine does not claim correctness
         } catch (err: any) {
           logger.error('LearningEvidenceEngine', `Error handling STUDENT_EXERCISE_COMPLETED event: ${err.message || err}`);
         }

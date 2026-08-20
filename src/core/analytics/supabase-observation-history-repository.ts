@@ -5,6 +5,9 @@
  * Gate 06B.2A: Evidence persistence crosses trusted server boundary.
  * recordObservation() calls Edge Function (service_role INSERT).
  * Read operations use authenticated browser client (SELECT allowed).
+ *
+ * Gate 06B.2B.2: submitExerciseEvidence() sends raw interaction facts to Edge Function.
+ * Edge Function resolves canonical exercise, derives curriculum, grades server-side.
  */
 
 import { supabase } from '../../infrastructure/supabase/client';
@@ -26,6 +29,31 @@ function getEdgeFunctionUrl(): string {
 
   const baseUrl = supabaseUrl.startsWith('http') ? supabaseUrl : `https://${supabaseUrl}`;
   return `${baseUrl}/functions/v1/ingest-evidence`;
+}
+
+/**
+ * Gate 06B.2B.2: Raw exercise interaction contract.
+ * Browser sends ONLY these fields. Everything else derived server-side.
+ */
+export interface ExerciseSubmissionRequest {
+  exerciseCode: string;
+  answer: string;
+  submissionId: string;
+  schoolId?: string;
+}
+
+/**
+ * Gate 06B.2B.2: Server-verified exercise evidence result.
+ */
+export interface ExerciseVerificationResult {
+  verified: {
+    exerciseCode: string;
+    subjectCode: string;
+    koCode: string;
+    competencies: string[];
+    isCorrect: boolean;
+    gradedBy: string;
+  };
 }
 
 export class SupabaseLearningObservationRepository implements ILearningObservationRepository {
@@ -85,6 +113,60 @@ export class SupabaseLearningObservationRepository implements ILearningObservati
 
     } catch (err: any) {
       logger.error('SupabaseLearningObservationRepository', `Edge Function call failed: ${err.message}`);
+      return { success: false };
+    }
+  }
+
+  /**
+   * Gate 06B.2B.2: Submit raw exercise interaction to trusted Edge Function.
+   * Edge Function resolves canonical exercise, derives curriculum, grades server-side.
+   * Browser does NOT send conceptId, isCorrect, mastery, or any educational claims.
+   */
+  public async submitExerciseEvidence(
+    submission: ExerciseSubmissionRequest
+  ): Promise<{ success: boolean; id?: string; duplicate?: boolean; verified?: ExerciseVerificationResult['verified'] }> {
+    const edgeFunctionUrl = getEdgeFunctionUrl();
+
+    if (!edgeFunctionUrl) {
+      logger.warn('SupabaseLearningObservationRepository', 'Edge Function URL not configured — exercise evidence not persisted');
+      return { success: false };
+    }
+
+    const { data: { session } } = await supabase.auth.getSession();
+    const jwt = session?.access_token;
+
+    if (!jwt) {
+      logger.warn('SupabaseLearningObservationRepository', 'No active session — exercise evidence not persisted');
+      return { success: false };
+    }
+
+    try {
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${jwt}`,
+        },
+        body: JSON.stringify({
+          exerciseCode: submission.exerciseCode,
+          answer: submission.answer,
+          submissionId: submission.submissionId,
+          schoolId: submission.schoolId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({ error: 'Unknown error' }));
+        logger.error('SupabaseLearningObservationRepository', `Edge Function exercise verification error (${response.status}): ${errorBody.error}`);
+        return { success: false };
+      }
+
+      const result = await response.json();
+      logger.info('SupabaseLearningObservationRepository', `Exercise evidence verified [${result.id}] via Edge Function: ${submission.exerciseCode}`);
+      return { success: true, id: result.id, duplicate: result.duplicate, verified: result.verified };
+
+    } catch (err: any) {
+      logger.error('SupabaseLearningObservationRepository', `Edge Function exercise call failed: ${err.message}`);
       return { success: false };
     }
   }
