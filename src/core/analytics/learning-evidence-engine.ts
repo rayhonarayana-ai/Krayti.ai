@@ -123,26 +123,32 @@ export class LearningEvidenceEngine {
           const studentId = authUser?.id || payload.studentId || event.actorId;
           if (!studentId) return;
 
+          // GATE 06B.1.1: Fail closed — resolve school membership state
+          const schoolContext = await authService.resolveSchoolContext();
+          if (schoolContext.status === 'NONE') {
+            logger.warn('LearningEvidenceEngine', `Evidence blocked: no STUDENT school membership for ${studentId}`);
+            return;
+          }
+          if (schoolContext.status === 'AMBIGUOUS') {
+            logger.warn('LearningEvidenceEngine', `Evidence blocked: ambiguous school memberships for ${studentId} (${schoolContext.schoolIds.length} schools)`);
+            return;
+          }
+          const schoolId = schoolContext.schoolId;
+
           const isCorrect = Boolean(payload.isCorrect);
           const exerciseId = String(payload.exerciseId || 'exercise-unknown');
           const topic = payload.topic ? String(payload.topic) : undefined;
 
           this.recordExerciseEvent(studentId, exerciseId, isCorrect, topic);
 
-          // GATE 06B.1: School identity from DB-grounded auth session
-          // event.schoolId is contextual input, NOT authorization proof.
-          // RLS validates membership at INSERT time.
-          const schoolId = authUser?.schoolId || null;
-
           // Persist append-only observation
           // P0.4: NEVER use exerciseId as conceptId — use topic if available, otherwise mark as unmapped
           const conceptId = topic || 'NO_COMPETENCY_MAPPING';
           const exerciseBusinessId = String(payload.submissionId || payload.attemptId || '');
-          // GATE 06B.1: Idempotency key includes school_id for cross-school dedup
-          const schoolSegment = schoolId || 'noschool';
+          // GATE 06B.1.1: Idempotency key includes resolved school_id
           const exerciseIdempotencyKey = exerciseBusinessId
-            ? `obs_ex_${studentId}_${schoolSegment}_${exerciseBusinessId}`
-            : `obs_ex_${studentId}_${schoolSegment}_${exerciseId}_${event.id}`;
+            ? `obs_ex_${studentId}_${schoolId}_${exerciseBusinessId}`
+            : `obs_ex_${studentId}_${schoolId}_${exerciseId}_${event.id}`;
 
           await observationHistoryRepo.recordObservation({
             studentId,
@@ -177,6 +183,18 @@ export class LearningEvidenceEngine {
           const studentId = authUser?.id || payload.studentId || event.actorId;
           if (!studentId) return;
 
+          // GATE 06B.1.1: Fail closed — resolve school membership state
+          const schoolContext = await authService.resolveSchoolContext();
+          if (schoolContext.status === 'NONE') {
+            logger.warn('LearningEvidenceEngine', `Evidence blocked: no STUDENT school membership for ${studentId}`);
+            return;
+          }
+          if (schoolContext.status === 'AMBIGUOUS') {
+            logger.warn('LearningEvidenceEngine', `Evidence blocked: ambiguous school memberships for ${studentId} (${schoolContext.schoolIds.length} schools)`);
+            return;
+          }
+          const schoolId = schoolContext.schoolId;
+
           const conceptCode = String(payload.koId || payload.conceptCode || 'GAP-UNKNOWN');
           const isSuccess = payload.success !== undefined ? Boolean(payload.success) : true;
           const misconception = payload.misconceptionCleared ? String(payload.misconceptionCleared) : undefined;
@@ -202,15 +220,11 @@ export class LearningEvidenceEngine {
             await longTermMemoryRepo.updateConceptMastery(studentId, conceptCode, payload.newMastery);
           }
 
-          // GATE 06B.1: School identity from DB-grounded auth session
-          const schoolId = authUser?.schoolId || null;
-
           // Persist append-only observation
           const gapBusinessId = String(payload.remediationId || payload.attemptId || payload.submissionId || '');
-          const schoolSegment = schoolId || 'noschool';
           const gapIdempotencyKey = gapBusinessId
-            ? `obs_gap_${studentId}_${schoolSegment}_${conceptCode}_${gapBusinessId}`
-            : `obs_gap_${studentId}_${schoolSegment}_${conceptCode}_${event.id}`;
+            ? `obs_gap_${studentId}_${schoolId}_${conceptCode}_${gapBusinessId}`
+            : `obs_gap_${studentId}_${schoolId}_${conceptCode}_${event.id}`;
 
           await observationHistoryRepo.recordObservation({
             studentId,
@@ -245,19 +259,27 @@ export class LearningEvidenceEngine {
           const studentId = authUser?.id || payload.studentId || event.actorId;
           if (!studentId) return;
 
+          // GATE 06B.1.1: Fail closed — resolve school membership state
+          const schoolContext = await authService.resolveSchoolContext();
+          if (schoolContext.status === 'NONE') {
+            logger.warn('LearningEvidenceEngine', `Evidence blocked: no STUDENT school membership for ${studentId}`);
+            return;
+          }
+          if (schoolContext.status === 'AMBIGUOUS') {
+            logger.warn('LearningEvidenceEngine', `Evidence blocked: ambiguous school memberships for ${studentId} (${schoolContext.schoolIds.length} schools)`);
+            return;
+          }
+          const schoolId = schoolContext.schoolId;
+
           const lessonId = String(payload.lessonId || 'lesson-unknown');
 
           this.recordLessonEvent(studentId, lessonId);
 
-          // GATE 06B.1: School identity from DB-grounded auth session
-          const schoolId = authUser?.schoolId || null;
-
           // Persist append-only observation
           const lessonBusinessId = String(payload.completionId || payload.attemptId || payload.submissionId || '');
-          const schoolSegment = schoolId || 'noschool';
           const lessonIdempotencyKey = lessonBusinessId
-            ? `obs_les_${studentId}_${schoolSegment}_${lessonId}_${lessonBusinessId}`
-            : `obs_les_${studentId}_${schoolSegment}_${lessonId}_${event.id}`;
+            ? `obs_les_${studentId}_${schoolId}_${lessonId}_${lessonBusinessId}`
+            : `obs_les_${studentId}_${schoolId}_${lessonId}_${event.id}`;
 
           await observationHistoryRepo.recordObservation({
             studentId,
@@ -292,6 +314,18 @@ export class LearningEvidenceEngine {
           const studentId = authUser?.id || payload.studentId || event.actorId;
           if (!studentId) return;
 
+          // GATE 06B.1.1: Fail closed — resolve school membership state
+          const schoolContext = await authService.resolveSchoolContext();
+          if (schoolContext.status === 'NONE') {
+            logger.warn('LearningEvidenceEngine', `Evidence blocked: no STUDENT school membership for ${studentId}`);
+            return;
+          }
+          if (schoolContext.status === 'AMBIGUOUS') {
+            logger.warn('LearningEvidenceEngine', `Evidence blocked: ambiguous school memberships for ${studentId} (${schoolContext.schoolIds.length} schools)`);
+            return;
+          }
+          const schoolId = schoolContext.schoolId;
+
           const conceptCode = String(payload.koId || payload.conceptCode || 'CONCEPT-UNKNOWN');
           const score = typeof payload.mastery === 'number' ? payload.mastery : 1.0;
 
@@ -309,15 +343,11 @@ export class LearningEvidenceEngine {
 
           await longTermMemoryRepo.updateConceptMastery(studentId, conceptCode, score);
 
-          // GATE 06B.1: School identity from DB-grounded auth session
-          const schoolId = authUser?.schoolId || null;
-
           // Persist append-only observation
           const skillBusinessId = String(payload.masteryId || payload.attemptId || payload.traceId || '');
-          const schoolSegment = schoolId || 'noschool';
           const skillIdempotencyKey = skillBusinessId
-            ? `obs_skl_${studentId}_${schoolSegment}_${conceptCode}_${skillBusinessId}`
-            : `obs_skl_${studentId}_${schoolSegment}_${conceptCode}_${event.id}`;
+            ? `obs_skl_${studentId}_${schoolId}_${conceptCode}_${skillBusinessId}`
+            : `obs_skl_${studentId}_${schoolId}_${conceptCode}_${event.id}`;
 
           await observationHistoryRepo.recordObservation({
             studentId,

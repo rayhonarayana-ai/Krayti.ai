@@ -6,7 +6,7 @@
  * user_metadata.role is NO LONGER used as production authorization authority.
  */
 
-import { UserRole, UserProfile, AuthSession, ResourceDomain, PermissionAction } from '../../domain/types/auth.types';
+import { UserRole, UserProfile, AuthSession, ResourceDomain, PermissionAction, SchoolMembershipState } from '../../domain/types/auth.types';
 import { EducationLevel, HighSchoolTrack, EducationLanguage } from '../../domain/types/education.types';
 import { rbacManager } from './rbac.manager';
 import { logger } from '../logging/logger';
@@ -89,6 +89,36 @@ export class AuthService implements IAuthService {
       return data as string;
     } catch {
       return undefined;
+    }
+  }
+
+  /**
+   * GATE 06B.1.1: Resolve school membership state for institutional evidence.
+   * Returns NONE / RESOLVED (exactly one) / AMBIGUOUS (multiple).
+   * This is the minimum domain behavior to enforce fail-closed multi-school.
+   *
+   * RLS on school_memberships scopes to auth.uid() — no user_id filter needed.
+   */
+  public async resolveSchoolContext(): Promise<SchoolMembershipState> {
+    try {
+      const { data, error } = await supabase
+        .from('school_memberships')
+        .select('school_id')
+        .eq('role', 'STUDENT');
+
+      if (error || !data || data.length === 0) {
+        return { status: 'NONE' };
+      }
+
+      const schoolIds = data.map((m: { school_id: string }) => m.school_id);
+
+      if (schoolIds.length === 1) {
+        return { status: 'RESOLVED', schoolId: schoolIds[0] };
+      } else {
+        return { status: 'AMBIGUOUS', schoolIds };
+      }
+    } catch {
+      return { status: 'NONE' };
     }
   }
 

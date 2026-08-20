@@ -78,3 +78,12 @@ export interface JWTClaims {
   exp: number;
   iss: string;
 }
+
+/**
+ * GATE 06B.1.1: School membership resolution state.
+ * Used to enforce fail-closed behavior for institutional evidence creation.
+ */
+export type SchoolMembershipState =
+  | { status: 'NONE' }
+  | { status: 'RESOLVED'; schoolId: string }
+  | { status: 'AMBIGUOUS'; schoolIds: string[] };
