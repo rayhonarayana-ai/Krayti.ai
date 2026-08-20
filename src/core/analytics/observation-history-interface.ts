@@ -3,10 +3,12 @@
  * Sprint 2.6: Append-Only Observation History Contract
  *
  * Gate 06B.2B.2.1: Verified interaction semantics.
+ * Gate 06C.1: ALL non-exercise observations use neutral mastery sentinel.
  *
- * currentMastery: Concept mastery score (0.0–1.0). For EXERCISE_COMPLETION observations,
- *   this is set to 0 (neutral) because a single exercise outcome is NOT concept mastery.
- *   Mastery is derived later by the mastery derivation gate.
+ * currentMastery: Concept mastery score (0.0–1.0). For ALL observations except
+ *   server-graded exercises, this is set to 0 (neutral) because unverified events
+ *   MUST NOT establish mastery. Mastery is derived from observation history by
+ *   computeHistoricalTrajectory(), never claimed by event payloads.
  *
  * interactionResult: Verified exercise outcome ('CORRECT' | 'INCORRECT' | null).
  *   Only populated for EXERCISE_COMPLETION observations. This is the factual record

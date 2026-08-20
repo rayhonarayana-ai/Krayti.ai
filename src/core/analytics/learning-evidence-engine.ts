@@ -198,30 +198,30 @@ export class LearningEvidenceEngine {
           }
           const schoolId = schoolContext.schoolId;
 
-          const conceptCode = String(payload.koId || payload.conceptCode || 'GAP-UNKNOWN');
+          const conceptCode = String(payload.koId || payload.conceptCode || '');
+
+          // GATE 06C.1: Unknown concepts MUST NOT enter persistent learner mastery state
+          if (!conceptCode || conceptCode === 'GAP-UNKNOWN' || conceptCode === 'NO_COMPETENCY_MAPPING') {
+            logger.warn('LearningEvidenceEngine', `ADAPTIVE_GAP_REMEDIATED blocked: unknown concept "${conceptCode}"`);
+            return;
+          }
+
           const isSuccess = payload.success !== undefined ? Boolean(payload.success) : true;
           const misconception = payload.misconceptionCleared ? String(payload.misconceptionCleared) : undefined;
 
           this.recordRemediationEvent(studentId, conceptCode, isSuccess, misconception);
 
-          // Fetch previous concept mastery for delta calculation
+          // GATE 06C.1: Mastery is DERIVED, never CLAIMED.
+          // Previous mastery read is informational only — used for observation delta, NOT for persistence write.
           let previousMastery: number | null = null;
-          try {
-            const memory = await longTermMemoryRepo.getLearnerMemory(studentId);
-            if (memory && memory.conceptMasteryScores && conceptCode in memory.conceptMasteryScores) {
-              previousMastery = memory.conceptMasteryScores[conceptCode];
-            }
-          } catch {
-            // Memory read fallback if new user
-          }
 
-          const newMastery = typeof payload.newMastery === 'number' ? payload.newMastery : (isSuccess ? 0.95 : 0.50);
-          const delta = previousMastery !== null ? Number((newMastery - previousMastery).toFixed(3)) : null;
+          // GATE 06C.1: currentMastery = 0 neutral sentinel.
+          // Untrusted events MUST NOT establish mastery. Mastery is derived from observation history.
+          const observationMastery = 0;
+          const delta = previousMastery !== null ? Number((observationMastery - previousMastery).toFixed(3)) : null;
 
-          // Grounding in repository: update concept mastery if new mastery score provided
-          if (isSuccess && typeof payload.newMastery === 'number') {
-            await longTermMemoryRepo.updateConceptMastery(studentId, conceptCode, payload.newMastery);
-          }
+          // GATE 06C.1: longTermMemoryRepo.updateConceptMastery REMOVED.
+          // Mastery is derived from observation history, never claimed by browser events.
 
           // Persist append-only observation
           const gapBusinessId = String(payload.remediationId || payload.attemptId || payload.submissionId || '');
@@ -240,7 +240,7 @@ export class LearningEvidenceEngine {
             sourceEventId: event.id,
             idempotencyKey: gapIdempotencyKey,
             previousMastery,
-            currentMastery: newMastery,
+            currentMastery: observationMastery,
             delta,
             confidence: typeof payload.confidence === 'number' ? payload.confidence : 1.0,
             metadata: { misconceptionCleared: misconception, isSuccess, correlationId: event.correlationId, remediationId: gapBusinessId || undefined },
@@ -276,9 +276,19 @@ export class LearningEvidenceEngine {
           }
           const schoolId = schoolContext.schoolId;
 
-          const lessonId = String(payload.lessonId || 'lesson-unknown');
+          const lessonId = String(payload.lessonId || '');
+
+          // GATE 06C.1: Unknown concepts MUST NOT enter persistent learner mastery state
+          if (!lessonId || lessonId === 'lesson-unknown') {
+            logger.warn('LearningEvidenceEngine', `STUDENT_LESSON_FINISHED blocked: unknown lesson "${lessonId}"`);
+            return;
+          }
 
           this.recordLessonEvent(studentId, lessonId);
+
+          // GATE 06C.1: Lesson completion does NOT establish mastery.
+          // currentMastery = 0 neutral sentinel. Mastery is derived from observation history.
+          const observationMastery = 0;
 
           // Persist append-only observation
           const lessonBusinessId = String(payload.completionId || payload.attemptId || payload.submissionId || '');
@@ -297,7 +307,7 @@ export class LearningEvidenceEngine {
             sourceEventId: event.id,
             idempotencyKey: lessonIdempotencyKey,
             previousMastery: null,
-            currentMastery: 1.0,
+            currentMastery: observationMastery,
             delta: null,
             confidence: 1.0,
             metadata: { lessonId, correlationId: event.correlationId, completionId: lessonBusinessId || undefined },
@@ -333,22 +343,35 @@ export class LearningEvidenceEngine {
           }
           const schoolId = schoolContext.schoolId;
 
-          const conceptCode = String(payload.koId || payload.conceptCode || 'CONCEPT-UNKNOWN');
-          const score = typeof payload.mastery === 'number' ? payload.mastery : 1.0;
+          const conceptCode = String(payload.koId || payload.conceptCode || '');
 
-          let previousMastery: number | null = null;
-          try {
-            const memory = await longTermMemoryRepo.getLearnerMemory(studentId);
-            if (memory && memory.conceptMasteryScores && conceptCode in memory.conceptMasteryScores) {
-              previousMastery = memory.conceptMasteryScores[conceptCode];
-            }
-          } catch {
-            // Memory read fallback
+          // GATE 06C.1: Unknown concepts MUST NOT enter persistent learner mastery state
+          if (!conceptCode || conceptCode === 'CONCEPT-UNKNOWN' || conceptCode === 'NO_COMPETENCY_MAPPING') {
+            logger.warn('LearningEvidenceEngine', `ADAPTIVE_SKILL_MASTERED blocked: unknown concept "${conceptCode}"`);
+            return;
           }
 
-          const delta = previousMastery !== null ? Number((score - previousMastery).toFixed(3)) : null;
+          // GATE 06C.1: masteryProbability/mastery contract fix.
+          // Publisher sends masteryProbability; consumer must read it.
+          // DO NOT use corrected value as authority for persistent mastery — browser mastery remains UNTRUSTED.
+          // GATE 06C.1 CORRECTION: Diagnostic metadata must not fabricate values.
+          // If neither field exists, reportedMastery is null (omitted), not 1.0.
+          const reportedMastery = typeof payload.masteryProbability === 'number'
+            ? payload.masteryProbability
+            : typeof payload.mastery === 'number'
+              ? payload.mastery
+              : null;
 
-          await longTermMemoryRepo.updateConceptMastery(studentId, conceptCode, score);
+          let previousMastery: number | null = null;
+
+          // GATE 06C.1: Mastery is DERIVED, never CLAIMED.
+          // currentMastery = 0 neutral sentinel.
+          // Untrusted events MUST NOT establish mastery. Mastery is derived from observation history.
+          const observationMastery = 0;
+          const delta = previousMastery !== null ? Number((observationMastery - previousMastery).toFixed(3)) : null;
+
+          // GATE 06C.1: longTermMemoryRepo.updateConceptMastery REMOVED.
+          // Mastery is derived from observation history, never claimed by browser events.
 
           // Persist append-only observation
           const skillBusinessId = String(payload.masteryId || payload.attemptId || payload.traceId || '');
@@ -367,10 +390,10 @@ export class LearningEvidenceEngine {
             sourceEventId: event.id,
             idempotencyKey: skillIdempotencyKey,
             previousMastery,
-            currentMastery: score,
+            currentMastery: observationMastery,
             delta,
             confidence: 1.0,
-            metadata: { koId: conceptCode, correlationId: event.correlationId, masteryId: skillBusinessId || undefined },
+            metadata: { koId: conceptCode, correlationId: event.correlationId, masteryId: skillBusinessId || undefined, reportedMastery },
             occurredAt: event.timestamp || new Date().toISOString(),
           }).catch((err) => logger.error('LearningEvidenceEngine', `Observation persistence error: ${err.message}`));
         } catch (err: any) {
@@ -424,13 +447,22 @@ export class LearningEvidenceEngine {
       ? await observationHistoryRepo.getObservationsForConcept(studentId, conceptId)
       : await observationHistoryRepo.getObservationsForStudent(studentId);
 
-    // Gate 06B.2B.2.1: Filter out EXERCISE_COMPLETION observations from mastery trajectory.
-    // Exercise observations record verified interaction outcomes (correct/incorrect),
-    // NOT concept mastery. They use currentMastery=0 (neutral sentinel).
-    // Only mastery-signal observations (GAP_REMEDIATED, SKILL_MASTERED, LESSON_FINISHED)
-    // contribute to trajectory computation.
+    // Gate 06B.2B.2.1 + Gate 06C.1: Filter to ONLY trusted mastery-bearing observation types.
+    // EXERCISE_COMPLETION = verified interaction, NOT mastery (currentMastery=0 sentinel).
+    // LESSON_COMPLETION = untrusted participation event, NOT mastery (currentMastery=0 sentinel).
+    // ADAPTIVE_GAP_REMEDIATED = untrusted/dead event, NOT mastery (currentMastery=0 sentinel).
+    // ADAPTIVE_SKILL_MASTERED = untrusted client declaration, NOT mastery (currentMastery=0 sentinel).
+    //
+    // Until a later Gate creates trusted DERIVED_MASTERY observation types, NO observation type
+    // currently carries numeric mastery authority. The trajectory may legitimately return
+    // NO_EVIDENCE rather than fabricate mastery from untrusted events.
+    const TRUSTED_MASTERY_TYPES = new Set<string>([
+      // Empty — no trusted mastery-bearing observation types exist yet.
+      // When a later Gate introduces DERIVED_MASTERY, add it here.
+    ]);
+
     const masteryObservations = (observations || []).filter(
-      (o) => o.observationType !== 'EXERCISE_COMPLETION'
+      (o) => TRUSTED_MASTERY_TYPES.has(o.observationType)
     );
 
     if (!masteryObservations || masteryObservations.length === 0) {
@@ -593,14 +625,26 @@ export class LearningEvidenceEngine {
   }
 
   /**
-   * Calculates empirical proof of student learning progression based on real learner data
+   * Calculates empirical proof of student learning progression.
+   *
+   * GATE 06C.1 CORRECTION: currentMasteryPercent and completedKosCount are derived from
+   * learner_memory.concept_mastery_scores, which is LEGACY_UNTRUSTED_DERIVED_STATE.
+   * Historical values may be contaminated by prior untrusted writes.
+   * These metrics are NOT authoritative mastery — they are retained for backward
+   * compatibility only. A later Gate must rebuild this from observation history.
    */
   public async getStudentEvidence(studentId: string): Promise<StudentLearningEvidence> {
     if (!studentId) {
       throw new Error('studentId parameter is required for getStudentEvidence');
     }
 
-    // 1. Fetch real learner memory grounded in Supabase / Long Term Memory Repository
+    // GATE 06C.1 CORRECTION: learner_memory.concept_mastery_scores is LEGACY_UNTRUSTED_DERIVED_STATE.
+    // Historical values may have been written by the now-removed untrusted paths
+    // (ADAPTIVE_SKILL_MASTERED, ADAPTIVE_GAP_REMEDIATED handlers).
+    // These values are NOT authoritative mastery. They are contaminated by prior client-claimed writes.
+    // Future Gate 06C.2 must rebuild this cache from observation history or mark it explicitly untrusted.
+    // For now, this read is retained for backward compatibility with teacher/parent dashboards,
+    // but the data it returns MUST NOT be presented as verified mastery.
     const learnerMemory = await longTermMemoryRepo.getLearnerMemory(studentId);
     const conceptScores = learnerMemory.conceptMasteryScores || {};
     const conceptCodes = Object.keys(conceptScores);
