@@ -1,6 +1,9 @@
 /**
  * Qarayti.ai — Authentication Foundation Service
- * Session lifecycle management, role verification, and JWT security foundation
+ * Session lifecycle management, trusted role resolution, and JWT security foundation
+ *
+ * GATE 06A: Role resolution from trusted DB sources (platform_roles, school_memberships).
+ * user_metadata.role is NO LONGER used as production authorization authority.
  */
 
 import { UserRole, UserProfile, AuthSession, ResourceDomain, PermissionAction } from '../../domain/types/auth.types';
@@ -42,34 +45,91 @@ export class AuthService implements IAuthService {
     });
   }
 
-  private updateSessionFromSupabase(session: any): void {
+  /**
+   * GATE 06A: Resolve trusted role from database, NOT from user_metadata.
+   * Priority: platform_roles (SUPER_ADMIN) > school_memberships > STUDENT default.
+   */
+  private async resolveTrustedRole(userId: string): Promise<UserRole> {
+    try {
+      const { data, error } = await supabase.rpc('get_user_trusted_role', {
+        target_user_id: userId,
+      });
+
+      if (error) {
+        logger.warn('AuthService', `Trusted role resolution failed for ${userId}: ${error.message}. Defaulting to STUDENT.`);
+        return UserRole.STUDENT;
+      }
+
+      const roleValue = (data as string) || 'STUDENT';
+      const validRoles = Object.values(UserRole);
+      if (validRoles.includes(roleValue as UserRole)) {
+        return roleValue as UserRole;
+      }
+
+      logger.warn('AuthService', `Invalid role value from DB for ${userId}: ${roleValue}. Defaulting to STUDENT.`);
+      return UserRole.STUDENT;
+    } catch (err) {
+      logger.error('AuthService', `Trusted role resolution exception for ${userId}: ${(err as Error).message}. Defaulting to STUDENT.`);
+      return UserRole.STUDENT;
+    }
+  }
+
+  /**
+   * Resolve a user's school_id from school_memberships.
+   */
+  private async resolveSchoolId(userId: string): Promise<string | undefined> {
+    try {
+      const { data, error } = await supabase.rpc('get_user_school_id', {
+        target_user_id: userId,
+      });
+
+      if (error || !data) {
+        return undefined;
+      }
+
+      return data as string;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async updateSessionFromSupabase(session: any): Promise<void> {
     if (!session || !session.user) {
       this.currentSession = null;
-    } else {
-      const user = session.user;
-      const userProfile: UserProfile = {
-        id: user.id,
-        email: user.email || '',
-        fullName: user.user_metadata?.full_name || user.email || 'Qarayti User',
-        role: (user.user_metadata?.role as UserRole) || UserRole.STUDENT,
-        preferredLanguage: EducationLanguage.ARABIC,
-        educationLevel: EducationLevel.HIGH_SCHOOL,
-        track: HighSchoolTrack.MATHEMATICS_A,
-        academicYear: '2025/2026',
-        isVerified: true,
-        isActive: true,
-        createdAt: new Date(user.created_at || Date.now()),
-        updatedAt: new Date(),
-      };
-
-      this.currentSession = {
-        accessToken: session.access_token,
-        refreshToken: session.refresh_token || '',
-        expiresAt: session.expires_at || Math.floor(Date.now() / 1000) + 3600,
-        user: userProfile,
-      };
+      this.notifyListeners();
+      return;
     }
-    logger.info('AuthService', `Supabase session updated for user: ${this.currentSession?.user.id || 'Anonymous'}`);
+
+    const user = session.user;
+
+    // GATE 06A: Resolve trusted role from DB, NOT from user_metadata
+    const trustedRole = await this.resolveTrustedRole(user.id);
+    const schoolId = await this.resolveSchoolId(user.id);
+
+    const userProfile: UserProfile = {
+      id: user.id,
+      email: user.email || '',
+      fullName: user.user_metadata?.full_name || user.email || 'Qarayti User',
+      role: trustedRole,
+      preferredLanguage: EducationLanguage.ARABIC,
+      educationLevel: EducationLevel.HIGH_SCHOOL,
+      track: HighSchoolTrack.MATHEMATICS_A,
+      academicYear: '2025/2026',
+      schoolId,
+      isVerified: true,
+      isActive: true,
+      createdAt: new Date(user.created_at || Date.now()),
+      updatedAt: new Date(),
+    };
+
+    this.currentSession = {
+      accessToken: session.access_token,
+      refreshToken: session.refresh_token || '',
+      expiresAt: session.expires_at || Math.floor(Date.now() / 1000) + 3600,
+      user: userProfile,
+    };
+
+    logger.info('AuthService', `Session resolved for user: ${user.id} | Trusted role: ${trustedRole} | School: ${schoolId || 'none'}`);
     this.notifyListeners();
   }
 
@@ -77,7 +137,7 @@ export class AuthService implements IAuthService {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
     if (data.session) {
-      this.updateSessionFromSupabase(data.session);
+      await this.updateSessionFromSupabase(data.session);
     }
     return this.currentSession;
   }
@@ -86,7 +146,7 @@ export class AuthService implements IAuthService {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     if (data.session) {
-      this.updateSessionFromSupabase(data.session);
+      await this.updateSessionFromSupabase(data.session);
     }
     return this.currentSession;
   }
@@ -119,7 +179,14 @@ export class AuthService implements IAuthService {
     return rbacManager.hasPermission(user.role, resource, action);
   }
 
+  /**
+   * GATE 06A: Production-safe foundation session.
+   * Creates a synthetic session for development/foundation testing only.
+   * In production, all role resolution goes through the DB.
+   */
   public setFoundationSession(role: UserRole): AuthSession {
+    logger.warn('AuthService', `setFoundationSession called with role: ${role}. This is a foundation-only session — NOT production authorization.`);
+
     const sampleUser: UserProfile = {
       id: `usr-${role.toLowerCase()}-001`,
       email: `foundation.${role.toLowerCase()}@qarayti.ai`,
@@ -144,7 +211,7 @@ export class AuthService implements IAuthService {
       user: sampleUser,
     };
 
-    logger.info('AuthService', `Foundation auth session updated to role: ${role}`);
+    logger.info('AuthService', `Foundation auth session set to role: ${role} (not backed by DB — development only)`);
     this.notifyListeners();
     return this.currentSession;
   }
