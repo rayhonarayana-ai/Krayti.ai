@@ -7,6 +7,7 @@ export interface LearningEvidenceObservation {
   id?: string;
   studentId: string;
   tenantId?: string;
+  schoolId?: string | null;
   conceptId: string;
   observationType: string;
   evidenceSource: string;

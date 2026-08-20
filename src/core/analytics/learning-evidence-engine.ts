@@ -129,17 +129,25 @@ export class LearningEvidenceEngine {
 
           this.recordExerciseEvent(studentId, exerciseId, isCorrect, topic);
 
+          // GATE 06B.1: School identity from DB-grounded auth session
+          // event.schoolId is contextual input, NOT authorization proof.
+          // RLS validates membership at INSERT time.
+          const schoolId = authUser?.schoolId || null;
+
           // Persist append-only observation
           // P0.4: NEVER use exerciseId as conceptId — use topic if available, otherwise mark as unmapped
           const conceptId = topic || 'NO_COMPETENCY_MAPPING';
           const exerciseBusinessId = String(payload.submissionId || payload.attemptId || '');
+          // GATE 06B.1: Idempotency key includes school_id for cross-school dedup
+          const schoolSegment = schoolId || 'noschool';
           const exerciseIdempotencyKey = exerciseBusinessId
-            ? `obs_ex_${studentId}_${exerciseBusinessId}`
-            : `obs_ex_${studentId}_${exerciseId}_${event.id}`;
+            ? `obs_ex_${studentId}_${schoolSegment}_${exerciseBusinessId}`
+            : `obs_ex_${studentId}_${schoolSegment}_${exerciseId}_${event.id}`;
 
           await observationHistoryRepo.recordObservation({
             studentId,
             tenantId: event.schoolId || 'default',
+            schoolId,
             conceptId,
             observationType: 'EXERCISE_COMPLETION',
             evidenceSource: 'QaraytiEventBus',
@@ -194,15 +202,20 @@ export class LearningEvidenceEngine {
             await longTermMemoryRepo.updateConceptMastery(studentId, conceptCode, payload.newMastery);
           }
 
+          // GATE 06B.1: School identity from DB-grounded auth session
+          const schoolId = authUser?.schoolId || null;
+
           // Persist append-only observation
           const gapBusinessId = String(payload.remediationId || payload.attemptId || payload.submissionId || '');
+          const schoolSegment = schoolId || 'noschool';
           const gapIdempotencyKey = gapBusinessId
-            ? `obs_gap_${studentId}_${conceptCode}_${gapBusinessId}`
-            : `obs_gap_${studentId}_${conceptCode}_${event.id}`;
+            ? `obs_gap_${studentId}_${schoolSegment}_${conceptCode}_${gapBusinessId}`
+            : `obs_gap_${studentId}_${schoolSegment}_${conceptCode}_${event.id}`;
 
           await observationHistoryRepo.recordObservation({
             studentId,
             tenantId: event.schoolId || 'default',
+            schoolId,
             conceptId: conceptCode,
             observationType: 'ADAPTIVE_GAP_REMEDIATED',
             evidenceSource: 'QaraytiEventBus',
@@ -236,15 +249,20 @@ export class LearningEvidenceEngine {
 
           this.recordLessonEvent(studentId, lessonId);
 
+          // GATE 06B.1: School identity from DB-grounded auth session
+          const schoolId = authUser?.schoolId || null;
+
           // Persist append-only observation
           const lessonBusinessId = String(payload.completionId || payload.attemptId || payload.submissionId || '');
+          const schoolSegment = schoolId || 'noschool';
           const lessonIdempotencyKey = lessonBusinessId
-            ? `obs_les_${studentId}_${lessonId}_${lessonBusinessId}`
-            : `obs_les_${studentId}_${lessonId}_${event.id}`;
+            ? `obs_les_${studentId}_${schoolSegment}_${lessonId}_${lessonBusinessId}`
+            : `obs_les_${studentId}_${schoolSegment}_${lessonId}_${event.id}`;
 
           await observationHistoryRepo.recordObservation({
             studentId,
             tenantId: event.schoolId || 'default',
+            schoolId,
             conceptId: lessonId,
             observationType: 'LESSON_COMPLETION',
             evidenceSource: 'QaraytiEventBus',
@@ -291,15 +309,20 @@ export class LearningEvidenceEngine {
 
           await longTermMemoryRepo.updateConceptMastery(studentId, conceptCode, score);
 
+          // GATE 06B.1: School identity from DB-grounded auth session
+          const schoolId = authUser?.schoolId || null;
+
           // Persist append-only observation
           const skillBusinessId = String(payload.masteryId || payload.attemptId || payload.traceId || '');
+          const schoolSegment = schoolId || 'noschool';
           const skillIdempotencyKey = skillBusinessId
-            ? `obs_skl_${studentId}_${conceptCode}_${skillBusinessId}`
-            : `obs_skl_${studentId}_${conceptCode}_${event.id}`;
+            ? `obs_skl_${studentId}_${schoolSegment}_${conceptCode}_${skillBusinessId}`
+            : `obs_skl_${studentId}_${schoolSegment}_${conceptCode}_${event.id}`;
 
           await observationHistoryRepo.recordObservation({
             studentId,
             tenantId: event.schoolId || 'default',
+            schoolId,
             conceptId: conceptCode,
             observationType: 'ADAPTIVE_SKILL_MASTERED',
             evidenceSource: 'QaraytiEventBus',

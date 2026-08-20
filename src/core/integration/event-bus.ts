@@ -144,7 +144,7 @@ export class QaraytiEventBus {
       timestamp: new Date().toISOString(),
       actorId,
       actorRole,
-      schoolId: schoolId || 'school-lycee-descartes',
+      schoolId: schoolId || undefined,
       payload: sanitizedPayload,
       correlationId: correlationId || `corr-${Date.now()}`,
     };

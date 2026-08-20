@@ -21,6 +21,7 @@ export class SupabaseLearningObservationRepository implements ILearningObservati
     const dbRecord = {
       student_id: observation.studentId,
       tenant_id: observation.tenantId || 'default',
+      school_id: observation.schoolId || null,
       concept_id: observation.conceptId,
       observation_type: observation.observationType,
       evidence_source: observation.evidenceSource,
@@ -116,6 +117,7 @@ export class SupabaseLearningObservationRepository implements ILearningObservati
       id: row.id,
       studentId: row.student_id,
       tenantId: row.tenant_id,
+      schoolId: row.school_id || null,
       conceptId: row.concept_id,
       observationType: row.observation_type,
       evidenceSource: row.evidence_source,
