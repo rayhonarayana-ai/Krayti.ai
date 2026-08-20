@@ -120,7 +120,8 @@ export class LearningEvidenceEngine {
         try {
           const payload = (event.payload || {}) as Record<string, any>;
           const authUser = authService.getCurrentUser();
-          const studentId = authUser?.id || payload.studentId || event.actorId;
+          // GATE 06B.2A: studentId from verified authentication ONLY — no payload fallback
+          const studentId = authUser?.id;
           if (!studentId) return;
 
           // GATE 06B.1.1: Fail closed — resolve school membership state
@@ -180,7 +181,8 @@ export class LearningEvidenceEngine {
         try {
           const payload = (event.payload || {}) as Record<string, any>;
           const authUser = authService.getCurrentUser();
-          const studentId = authUser?.id || payload.studentId || event.actorId;
+          // GATE 06B.2A: studentId from verified authentication ONLY — no payload fallback
+          const studentId = authUser?.id;
           if (!studentId) return;
 
           // GATE 06B.1.1: Fail closed — resolve school membership state
@@ -256,7 +258,8 @@ export class LearningEvidenceEngine {
         try {
           const payload = (event.payload || {}) as Record<string, any>;
           const authUser = authService.getCurrentUser();
-          const studentId = authUser?.id || payload.studentId || event.actorId;
+          // GATE 06B.2A: studentId from verified authentication ONLY — no payload fallback
+          const studentId = authUser?.id;
           if (!studentId) return;
 
           // GATE 06B.1.1: Fail closed — resolve school membership state
@@ -311,7 +314,8 @@ export class LearningEvidenceEngine {
         try {
           const payload = (event.payload || {}) as Record<string, any>;
           const authUser = authService.getCurrentUser();
-          const studentId = authUser?.id || payload.studentId || event.actorId;
+          // GATE 06B.2A: studentId from verified authentication ONLY — no payload fallback
+          const studentId = authUser?.id;
           if (!studentId) return;
 
           // GATE 06B.1.1: Fail closed — resolve school membership state

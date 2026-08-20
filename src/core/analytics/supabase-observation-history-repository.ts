@@ -1,58 +1,92 @@
 /**
  * Qarayti.ai — Supabase Learning Observation History Repository
  * Sprint 2.6: Append-Only Observation History Persistence Implementation
+ *
+ * Gate 06B.2A: Evidence persistence crosses trusted server boundary.
+ * recordObservation() calls Edge Function (service_role INSERT).
+ * Read operations use authenticated browser client (SELECT allowed).
  */
 
 import { supabase } from '../../infrastructure/supabase/client';
 import { logger } from '../logging/logger';
 import { ILearningObservationRepository, LearningEvidenceObservation } from './observation-history-interface';
 
+const metaEnv = ((import.meta as unknown) as { env?: Record<string, string> }).env || {};
+
+function getEdgeFunctionUrl(): string {
+  const supabaseUrl = (
+    metaEnv.VITE_SUPABASE_URL ||
+    (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) ||
+    ''
+  ).trim();
+
+  if (!supabaseUrl || supabaseUrl.includes('placeholder') || supabaseUrl.includes('your-project')) {
+    return '';
+  }
+
+  const baseUrl = supabaseUrl.startsWith('http') ? supabaseUrl : `https://${supabaseUrl}`;
+  return `${baseUrl}/functions/v1/ingest-evidence`;
+}
+
 export class SupabaseLearningObservationRepository implements ILearningObservationRepository {
   public async recordObservation(
     observation: LearningEvidenceObservation
   ): Promise<{ success: boolean; id?: string; duplicate?: boolean }> {
-    // Check idempotency first to avoid duplicate errors
-    const existing = await this.getObservationByIdempotencyKey(observation.idempotencyKey);
-    if (existing) {
-      logger.info('SupabaseLearningObservationRepository', `Duplicate observation skipped for key: ${observation.idempotencyKey}`);
-      return { success: true, id: existing.id, duplicate: true };
+    const edgeFunctionUrl = getEdgeFunctionUrl();
+
+    if (!edgeFunctionUrl) {
+      logger.warn('SupabaseLearningObservationRepository', 'Edge Function URL not configured — evidence not persisted');
+      return { success: false };
     }
 
-    const dbRecord = {
-      student_id: observation.studentId,
-      tenant_id: observation.tenantId || 'default',
-      school_id: observation.schoolId || null,
-      concept_id: observation.conceptId,
-      observation_type: observation.observationType,
-      evidence_source: observation.evidenceSource,
-      source_event_id: observation.sourceEventId,
-      idempotency_key: observation.idempotencyKey,
-      previous_mastery: observation.previousMastery,
-      current_mastery: observation.currentMastery,
-      delta: observation.delta,
-      confidence: observation.confidence ?? 1.0,
-      metadata: observation.metadata || {},
-      occurred_at: observation.occurredAt,
-    };
+    // Get the current session JWT for authorization
+    const { data: { session } } = await supabase.auth.getSession();
+    const jwt = session?.access_token;
 
-    const { data, error } = await supabase
-      .from('learning_observation_history')
-      .insert(dbRecord)
-      .select('id')
-      .single();
+    if (!jwt) {
+      logger.warn('SupabaseLearningObservationRepository', 'No active session — evidence not persisted');
+      return { success: false };
+    }
 
-    if (error) {
-      // Check for unique key violation (PostgreSQL 23505)
-      if (error.code === '23505' || error.message.includes('unique constraint') || error.message.includes('idempotency_key')) {
-        logger.info('SupabaseLearningObservationRepository', `Idempotency constraint handled for key: ${observation.idempotencyKey}`);
-        return { success: true, duplicate: true };
+    // Call trusted Edge Function for evidence persistence
+    // The Edge Function validates JWT, verifies school membership, and inserts via service_role
+    try {
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${jwt}`,
+        },
+        body: JSON.stringify({
+          conceptId: observation.conceptId,
+          observationType: observation.observationType,
+          evidenceSource: observation.evidenceSource,
+          sourceEventId: observation.sourceEventId,
+          idempotencyKey: observation.idempotencyKey,
+          previousMastery: observation.previousMastery,
+          currentMastery: observation.currentMastery,
+          delta: observation.delta,
+          confidence: observation.confidence,
+          metadata: observation.metadata || {},
+          occurredAt: observation.occurredAt,
+          // NOTE: studentId and schoolId are NOT sent — derived by Edge Function from JWT + membership
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({ error: 'Unknown error' }));
+        logger.error('SupabaseLearningObservationRepository', `Edge Function error (${response.status}): ${errorBody.error}`);
+        return { success: false };
       }
-      logger.error('SupabaseLearningObservationRepository', `Failed to record observation: ${error.message}`);
-      throw new Error(`Failed to record observation: ${error.message}`);
-    }
 
-    logger.info('SupabaseLearningObservationRepository', `Recorded new observation [${data?.id}] for student [${observation.studentId}]`);
-    return { success: true, id: data?.id, duplicate: false };
+      const result = await response.json();
+      logger.info('SupabaseLearningObservationRepository', `Recorded observation [${result.id}] for student via Edge Function`);
+      return { success: true, id: result.id, duplicate: result.duplicate };
+
+    } catch (err: any) {
+      logger.error('SupabaseLearningObservationRepository', `Edge Function call failed: ${err.message}`);
+      return { success: false };
+    }
   }
 
   public async getObservationsForStudent(
