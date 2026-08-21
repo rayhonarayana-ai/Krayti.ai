@@ -3,7 +3,7 @@
  * Shell component hosting all Student Portal modules
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   LayoutDashboard,
   Calendar,
@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { container } from '../../../core/di/container';
 import { authService } from '../../../core/auth/auth.service';
+import { observationHistoryRepo } from '../../../core/analytics/supabase-observation-history-repository';
 import { StudentPortalService } from '../../../domain/services/studentPortal.service';
 import { UserProfile, SchoolMembershipState } from '../../../domain/types/auth.types';
 import {
@@ -151,6 +152,16 @@ export const StudentPortalContainer: React.FC = () => {
 
   // Gate 06D.3: resolved schoolId for institutional data loading
   const resolvedSchoolId = schoolContext?.status === 'RESOLVED' ? schoolContext.schoolId : undefined;
+
+  // Gate 06D.4: Trusted exercise submission — calls Edge Function via observation history repository
+  const handleSubmitExercise = useCallback(async (exerciseCode: string, answer: string, submissionId: string) => {
+    return observationHistoryRepo.submitExerciseEvidence({
+      exerciseCode,
+      answer,
+      submissionId,
+      schoolId: resolvedSchoolId,
+    });
+  }, [resolvedSchoolId]);
 
   const loadData = async () => {
     if (!studentId || !resolvedSchoolId) {
@@ -327,7 +338,13 @@ export const StudentPortalContainer: React.FC = () => {
 
         {activeTab === 'learning-journey' && <LearningJourneyView lessons={lessons} />}
 
-        {activeTab === 'practice-exercises' && <PracticeExercisesView exercises={exercises} />}
+        {activeTab === 'practice-exercises' && (
+          <PracticeExercisesView
+            exercises={exercises}
+            schoolContextStatus={schoolContext?.status}
+            onSubmitExercise={handleSubmitExercise}
+          />
+        )}
 
         {activeTab === 'homework' && (
           <HomeworkCenterView

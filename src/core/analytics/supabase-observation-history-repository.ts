@@ -124,7 +124,7 @@ export class SupabaseLearningObservationRepository implements ILearningObservati
    */
   public async submitExerciseEvidence(
     submission: ExerciseSubmissionRequest
-  ): Promise<{ success: boolean; id?: string; duplicate?: boolean; verified?: ExerciseVerificationResult['verified'] }> {
+  ): Promise<{ success: boolean; id?: string; duplicate?: boolean; verified?: ExerciseVerificationResult['verified']; dataQualityWarning?: string; httpStatus?: number }> {
     const edgeFunctionUrl = getEdgeFunctionUrl();
 
     if (!edgeFunctionUrl) {
@@ -158,12 +158,18 @@ export class SupabaseLearningObservationRepository implements ILearningObservati
       if (!response.ok) {
         const errorBody = await response.json().catch(() => ({ error: 'Unknown error' }));
         logger.error('SupabaseLearningObservationRepository', `Edge Function exercise verification error (${response.status}): ${errorBody.error}`);
-        return { success: false };
+        return { success: false, httpStatus: response.status };
       }
 
       const result = await response.json();
       logger.info('SupabaseLearningObservationRepository', `Exercise evidence verified [${result.id}] via Edge Function: ${submission.exerciseCode}`);
-      return { success: true, id: result.id, duplicate: result.duplicate, verified: result.verified };
+      return {
+        success: true,
+        id: result.id,
+        duplicate: result.duplicate,
+        verified: result.verified,
+        dataQualityWarning: result.dataQualityWarning,
+      };
 
     } catch (err: any) {
       logger.error('SupabaseLearningObservationRepository', `Edge Function exercise call failed: ${err.message}`);

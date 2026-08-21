@@ -58,8 +58,40 @@ export interface StudentLesson {
   masteryScore: number; // 0-1
 }
 
+export type ExerciseSource =
+  | 'CANONICAL'
+  | 'PROTOTYPE_UNMAPPED'
+  | 'AI_GENERATED'
+  | 'UNKNOWN';
+
+/**
+ * Gate 06D.4 CORRECTION: Explicit pre-submission eligibility.
+ * Derives from exercise metadata — NOT from HTTP codes or runtime errors.
+ * Separates curriculum-provenance conditions from operational submission failures.
+ */
+export type ExerciseSubmissionEligibility =
+  | { status: 'ELIGIBLE' }
+  | { status: 'PROTOTYPE_UNMAPPED' }
+  | { status: 'CANONICAL_MISMATCH' }
+  | { status: 'UNSUPPORTED_GRADING_MODE'; mode?: string };
+
+export function getExerciseSubmissionEligibility(
+  exercise: StudentExercise | null,
+): ExerciseSubmissionEligibility {
+  if (!exercise) return { status: 'PROTOTYPE_UNMAPPED' };
+  if (exercise.exerciseSource !== 'CANONICAL') return { status: 'PROTOTYPE_UNMAPPED' };
+  if (!exercise.exerciseCode) return { status: 'PROTOTYPE_UNMAPPED' };
+  if (exercise.curriculumMismatch) return { status: 'CANONICAL_MISMATCH' };
+  if (exercise.unsupportedGrading) {
+    return { status: 'UNSUPPORTED_GRADING_MODE', mode: exercise.gradingMode };
+  }
+  return { status: 'ELIGIBLE' };
+}
+
 export interface StudentExercise {
   id: string;
+  exerciseCode?: string;
+  exerciseSource?: ExerciseSource;
   subjectId: string;
   topicAr: string;
   topicFr: string;
@@ -68,16 +100,23 @@ export interface StudentExercise {
   hints: string[];
   options?: string[]; // for MCQ
   // Gate 06B.2B.2.1: correctAnswer removed — answer authority in curriculum_exercise_grading (server-only)
-  solutionSteps?: string[]; // optional: only for AI-generated exercises
-  maxPoints: number; // out of 20 or fractional points
+  solutionSteps?: string[]; // optional: only for AI-generated exercises (NOT grading authority)
+  maxPoints: number;
   isAiGenerated?: boolean;
+  curriculumMismatch?: boolean;
+  unsupportedGrading?: boolean;
+  gradingMode?: string;
 }
 
 /**
- * Gate 06D.2: Explicit exercise verification state.
+ * Gate 06D.2 + 06D.4: Explicit exercise verification state.
  * An ungraded answer is NOT an incorrect answer.
  * PENDING_VERIFICATION must not carry any grading authority.
- * GRADED must carry a genuine server-verified result.
+ * GRADED must carry only genuine server-verified fields.
+ * ERROR carries a user-safe error message when verification fails.
+ *
+ * Gate 06D.4: scoreObtained, masteryGain, xpEarned removed — the Edge Function
+ * does not authoritatively provide them. Absence is not zero.
  */
 export type ExerciseSubmissionResult =
   | {
@@ -89,13 +128,23 @@ export type ExerciseSubmissionResult =
   | {
       status: 'GRADED';
       exerciseId: string;
+      exerciseCode: string;
       studentAnswer: string;
-      scoreObtained: number;
-      maxPoints: number;
-      feedbackAr: string;
       isCorrect: boolean;
-      masteryGain: number;
-      xpEarned: number;
+      feedbackAr: string;
+      subjectCode: string;
+      koCode: string;
+      competencies: string[];
+      observationId?: string;
+      duplicate?: boolean;
+      dataQualityWarning?: string;
+    }
+  | {
+      status: 'ERROR';
+      exerciseId: string;
+      studentAnswer: string;
+      feedbackAr: string;
+      errorCode?: string;
     };
 
 export interface HomeworkAssignment {

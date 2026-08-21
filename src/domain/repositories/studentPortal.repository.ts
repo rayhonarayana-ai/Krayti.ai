@@ -232,9 +232,29 @@ $$u_C(t) = E (1 - e^{-t/\\tau})$$`,
   public async getExercises(subjectId?: string, topic?: string): Promise<StudentExercise[]> {
     // Gate 06B.2B.2.1: Strip correctAnswer and solutionSteps from student-facing DTO.
     // Answer authority remains in curriculum_exercise_grading (server-side only).
+    // Gate 06D.4: exerciseSource explicitly declares canonical status.
+    // CANONICAL exercises are eligible for trusted submission via ingest-evidence.
+    // PROTOTYPE_UNMAPPED exercises cannot produce authoritative evidence — submission disabled.
     const exercises: StudentExercise[] = [
+      // Gate 06D.4: CANONICAL exercise — mapped to ko-math-001 (TVI), EXACT_ANSWER grading
+      {
+        id: 'q-math-001',
+        exerciseCode: 'q-math-001',
+        exerciseSource: 'CANONICAL',
+        subjectId: 'MATH',
+        topicAr: 'التحليل — النهايات والاتصال (Limites et Continuité)',
+        topicFr: 'Analyse — Limites et Continuité',
+        difficulty: 'MEDIUM',
+        questionText: 'Calculer la limite quand x tend vers 0 de (sin(3x) / x) :',
+        hints: ['استعمل حدودية sin(u)/u عند 0', 'sin(3x)/x = 3·sin(3x)/(3x)'],
+        options: ['0', '1', '3', 'Infinie'],
+        maxPoints: 4,
+      },
+      // Gate 06D.4: PROTOTYPE_UNMAPPED — ko_id NULL, no canonical KO exists
       {
         id: 'ex-01',
+        exerciseCode: 'ex-01',
+        exerciseSource: 'PROTOTYPE_UNMAPPED',
         subjectId: 'MATH',
         topicAr: 'الأعداد العقدية - المعادلة من الدرجة الثانية',
         topicFr: 'Nombres Complexes - Équation du 2nd degré',
@@ -248,8 +268,11 @@ $$u_C(t) = E (1 - e^{-t/\\tau})$$`,
         ],
         maxPoints: 3,
       },
+      // Gate 06D.4: PROTOTYPE_UNMAPPED — ko_id NULL, no physics KO exists
       {
         id: 'ex-02',
+        exerciseCode: 'ex-02',
+        exerciseSource: 'PROTOTYPE_UNMAPPED',
         subjectId: 'PHYS',
         topicAr: 'الفيزياء - ثنائي القطب RC وثابتة الزمن',
         topicFr: 'Dipôle RC - Constante de temps',
@@ -257,6 +280,35 @@ $$u_C(t) = E (1 - e^{-t/\\tau})$$`,
         questionText: 'أوجد تعبير constante de temps \\tau لدارة تحتوي على موصل أومي R = 100 \\,\\Omega ومكثف سعته C = 10 \\,\\mu F.',
         hints: ['تذكر تحويل \\mu F إلى Farad: 10 \\mu F = 10 \\times 10^{-6} F'],
         maxPoints: 2,
+      },
+      // Gate 06D.4: CANONICAL_MISMATCH — mapped to ko-math-002 (dichotomy) but content is complex numbers
+      {
+        id: 'q-math-002',
+        exerciseCode: 'q-math-002',
+        exerciseSource: 'CANONICAL',
+        subjectId: 'MATH',
+        topicAr: 'الأعداد العقدية — الشكل المثلثي (Forme Trigonométrique)',
+        topicFr: 'Nombres Complexes — Forme Trigonométrique',
+        difficulty: 'HARD',
+        questionText: 'Soit z = 1 + i√3. Écrire z sous forme trigonométrique et calculer z⁶.',
+        hints: ['|z| = √(1² + (√3)²) = 2', 'arg(z) = π/3'],
+        maxPoints: 4,
+        curriculumMismatch: true,
+      },
+      // Gate 06D.4: UNSUPPORTED_GRADING_MODE — RUBRIC grading not supported by trusted verification
+      {
+        id: 'q-svt-001',
+        exerciseCode: 'q-svt-001',
+        exerciseSource: 'CANONICAL',
+        subjectId: 'SVT',
+        topicAr: 'علوم الحياة — الأشجار sourceMappingية',
+        topicFr: 'SVT — Arbres Généalogiques',
+        difficulty: 'HARD',
+        questionText: 'Analyser l\'arbre généalogique fourni et déterminer si l\'allèle est dominant ou récessif.',
+        hints: ['ابحث عن ت Saltos de génération'],
+        maxPoints: 4,
+        unsupportedGrading: true,
+        gradingMode: 'RUBRIC',
       },
     ];
 
@@ -284,6 +336,7 @@ $$u_C(t) = E (1 - e^{-t/\\tau})$$`,
     return {
       id: `ai-gen-${Date.now()}`,
       subjectId: 'MATH',
+      exerciseSource: 'AI_GENERATED',
       topicAr: topic,
       topicFr: topic,
       difficulty: difficulty as any,

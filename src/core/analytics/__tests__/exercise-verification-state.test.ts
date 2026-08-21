@@ -1,9 +1,11 @@
 /**
- * Qarayti.ai — Gate 06D.2: Explicit Exercise Verification State Tests
+ * Qarayti.ai — Gate 06D.2 + 06D.4: Exercise Verification State Tests
  *
  * Proves that PENDING_VERIFICATION cannot be interpreted as INCORRECT,
- * that GRADED carries genuine grading authority, and that the pending
- * state carries no score/mastery/XP grading authority.
+ * that GRADED carries only genuine server-verified fields,
+ * that fabricated grading fields (scoreObtained, masteryGain, xpEarned)
+ * are removed from the trusted contract,
+ * and that ERROR state exists for failures.
  *
  * Run: npx tsx src/core/analytics/__tests__/exercise-verification-state.test.ts
  */
@@ -25,13 +27,13 @@ function assert(condition: boolean, message: string) {
 }
 
 // ============================================================
-// T1: PENDING_VERIFICATION has no isCorrect boolean authority
+// T1: PENDING_VERIFICATION has no grading authority
 // ============================================================
 const pendingResult: ExerciseSubmissionResult = {
   status: 'PENDING_VERIFICATION',
   exerciseId: 'ex-001',
   studentAnswer: 'z = 1 + i',
-  feedbackAr: 'تم إرسال إجابتك وهي بانتظار التحقق من الخادم.',
+  feedbackAr: 'تم إرسال إجابتك، جارٍ التحقق منها...',
 };
 
 assert(
@@ -63,12 +65,10 @@ assert(
 // T2: PENDING_VERIFICATION cannot be interpreted as INCORRECT
 // ============================================================
 const isPending = pendingResult.status === 'PENDING_VERIFICATION';
-// After narrowing to PENDING, status cannot be 'GRADED' — TypeScript proves it
 assert(
   isPending,
   'T2a: status is PENDING_VERIFICATION'
 );
-// Verify that all GRADED-exclusive fields are absent
 assert(
   !('isCorrect' in pendingResult),
   'T2b: PENDING_VERIFICATION cannot be interpreted as INCORRECT — isCorrect absent'
@@ -87,18 +87,18 @@ assert(
 );
 
 // ============================================================
-// T3: GRADED + isCorrect=false represents a genuinely graded incorrect answer
+// T3: GRADED + isCorrect=false — only server-proven fields
 // ============================================================
 const gradedIncorrect: ExerciseSubmissionResult = {
   status: 'GRADED',
   exerciseId: 'ex-002',
+  exerciseCode: 'q-math-001',
   studentAnswer: 'z = 2 + i',
-  scoreObtained: 14,
-  maxPoints: 20,
-  feedbackAr: 'إجابة غير صحيحة — تحقق من العمدة.',
+  feedbackAr: 'الإجابة غير صحيحة',
   isCorrect: false,
-  masteryGain: 0,
-  xpEarned: 5,
+  subjectCode: 'MATH',
+  koCode: 'ko-math-001',
+  competencies: ['comp-limit'],
 };
 
 assert(
@@ -112,23 +112,39 @@ assert(
 );
 
 assert(
-  gradedIncorrect.scoreObtained === 14,
-  'T3c: GRADED result carries genuine scoreObtained'
+  !('scoreObtained' in gradedIncorrect),
+  'T3c: GRADED result does NOT carry fabricated scoreObtained'
+);
+
+assert(
+  !('masteryGain' in gradedIncorrect),
+  'T3d: GRADED result does NOT carry fabricated masteryGain'
+);
+
+assert(
+  !('xpEarned' in gradedIncorrect),
+  'T3e: GRADED result does NOT carry fabricated xpEarned'
+);
+
+assert(
+  !('maxPoints' in gradedIncorrect),
+  'T3f: GRADED result does NOT carry maxPoints'
 );
 
 // ============================================================
-// T4: GRADED + isCorrect=true represents a genuinely graded correct answer
+// T4: GRADED + isCorrect=true — server-proven fields only
 // ============================================================
 const gradedCorrect: ExerciseSubmissionResult = {
   status: 'GRADED',
   exerciseId: 'ex-003',
-  studentAnswer: 'z = 1 + i',
-  scoreObtained: 20,
-  maxPoints: 20,
-  feedbackAr: 'إجابة صحيحة — أحسنت!',
+  exerciseCode: 'q-math-001',
+  studentAnswer: '3',
+  feedbackAr: 'إجابة صحيحة',
   isCorrect: true,
-  masteryGain: 0.05,
-  xpEarned: 15,
+  subjectCode: 'MATH',
+  koCode: 'ko-math-001',
+  competencies: ['comp-limit'],
+  observationId: 'obs-uuid-123',
 };
 
 assert(
@@ -142,17 +158,37 @@ assert(
 );
 
 assert(
-  gradedCorrect.masteryGain === 0.05,
-  'T4c: GRADED result carries genuine masteryGain'
+  gradedCorrect.exerciseCode === 'q-math-001',
+  'T4c: GRADED carries exerciseCode from server'
 );
 
 assert(
-  gradedCorrect.xpEarned === 15,
-  'T4d: GRADED result carries genuine xpEarned'
+  gradedCorrect.subjectCode === 'MATH',
+  'T4d: GRADED carries subjectCode from server'
+);
+
+assert(
+  gradedCorrect.koCode === 'ko-math-001',
+  'T4e: GRADED carries koCode from server'
+);
+
+assert(
+  Array.isArray(gradedCorrect.competencies),
+  'T4f: GRADED carries competencies from server'
+);
+
+assert(
+  !('masteryGain' in gradedCorrect),
+  'T4g: GRADED result does NOT carry fabricated masteryGain'
+);
+
+assert(
+  !('xpEarned' in gradedCorrect),
+  'T4h: GRADED result does NOT carry fabricated xpEarned'
 );
 
 // ============================================================
-// T5: Pending result carries no score/mastery/XP grading authority
+// T5: PENDING carries no grading authority
 // ============================================================
 assert(
   !('scoreObtained' in pendingResult) && !('masteryGain' in pendingResult) && !('xpEarned' in pendingResult),
@@ -162,12 +198,11 @@ assert(
 // ============================================================
 // T6: PracticeExercisesView creates PENDING_VERIFICATION, not fabricated GRADED
 // ============================================================
-// Simulate what PracticeExercisesView.handleSubmit creates:
 const simulatedViewSubmission: ExerciseSubmissionResult = {
   status: 'PENDING_VERIFICATION',
   exerciseId: 'ai-ex-12345',
   studentAnswer: 'test answer',
-  feedbackAr: 'تم إرسال إجابتك وهي بانتظار التحقق من الخادم.',
+  feedbackAr: 'تم إرسال إجابتك، جارٍ التحقق منها...',
 };
 
 assert(
@@ -196,15 +231,15 @@ assert(
 );
 
 // ============================================================
-// Type-narrowing proof: discriminant works correctly
+// T7: Type-narrowing proof — discriminant works correctly
 // ============================================================
 function processResult(result: ExerciseSubmissionResult): string {
   if (result.status === 'PENDING_VERIFICATION') {
-    // Must NOT access isCorrect, scoreObtained, masteryGain, xpEarned here
     return `pending:${result.exerciseId}`;
+  } else if (result.status === 'ERROR') {
+    return `error:${result.exerciseId}:${result.errorCode || 'UNKNOWN'}`;
   } else {
-    // GRADED — safe to access grading fields
-    return `graded:${result.exerciseId}:${result.isCorrect}:${result.scoreObtained}`;
+    return `graded:${result.exerciseId}:${result.isCorrect}:${result.exerciseCode}`;
   }
 }
 
@@ -216,12 +251,64 @@ assert(
 
 const gradedOutcome = processResult(gradedCorrect);
 assert(
-  gradedOutcome === 'graded:ex-003:true:20',
+  gradedOutcome === 'graded:ex-003:true:q-math-001',
   'T7b: Type narrowing correctly handles GRADED'
+);
+
+// ============================================================
+// T8: ERROR state exists for failures
+// ============================================================
+const errorResult: ExerciseSubmissionResult = {
+  status: 'ERROR',
+  exerciseId: 'ex-004',
+  studentAnswer: 'answer',
+  feedbackAr: 'تعذر التحقق من الإجابة. حاول مرة أخرى.',
+  errorCode: 'NETWORK_ERROR',
+};
+
+assert(
+  errorResult.status === 'ERROR',
+  'T8a: ERROR status is correctly set'
+);
+
+assert(
+  !('isCorrect' in errorResult),
+  'T8b: ERROR has no isCorrect property'
+);
+
+assert(
+  !('scoreObtained' in errorResult),
+  'T8c: ERROR has no scoreObtained'
+);
+
+assert(
+  errorResult.errorCode === 'NETWORK_ERROR',
+  'T8d: ERROR carries error code'
+);
+
+// ============================================================
+// T9: GRADED duplicate flag
+// ============================================================
+const duplicateResult: ExerciseSubmissionResult = {
+  status: 'GRADED',
+  exerciseId: 'ex-005',
+  exerciseCode: 'q-math-001',
+  studentAnswer: '3',
+  feedbackAr: 'إجابة صحيحة',
+  isCorrect: true,
+  subjectCode: 'MATH',
+  koCode: 'ko-math-001',
+  competencies: ['comp-limit'],
+  duplicate: true,
+};
+
+assert(
+  duplicateResult.duplicate === true,
+  'T9: GRADED result can carry duplicate flag from idempotent response'
 );
 
 // ============================================================
 // Summary
 // ============================================================
 console.log('');
-console.log(`--- GATE 06D.2: ALL ${passedTests}/${totalTests} TESTS PASSED SUCCESSFULLY ---`);
+console.log(`--- GATE 06D.2+06D.4: ALL ${passedTests}/${totalTests} TESTS PASSED SUCCESSFULLY ---`);
