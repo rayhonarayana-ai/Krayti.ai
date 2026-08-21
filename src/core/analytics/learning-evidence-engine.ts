@@ -478,6 +478,10 @@ export class LearningEvidenceEngine {
    * - < 2 observations -> INSUFFICIENT_EVIDENCE
    * - >= 2 observations -> OBSERVED (calculates empirical trajectory & delta)
    */
+  /**
+   * Gate 06C.4.1: Computes school-scoped historical evidence trajectory.
+   * Resolves trusted school context — fail closed on NONE/AMBIGUOUS.
+   */
   public async computeHistoricalTrajectory(
     studentId: string,
     conceptId?: string
@@ -486,9 +490,19 @@ export class LearningEvidenceEngine {
       throw new Error('studentId parameter is required for computeHistoricalTrajectory');
     }
 
+    // Gate 06C.4.1: Resolve trusted school context — fail closed on NONE/AMBIGUOUS
+    const schoolContext = await authService.resolveSchoolContext();
+    if (schoolContext.status === 'NONE') {
+      throw new Error('Cannot compute historical trajectory: no school membership');
+    }
+    if (schoolContext.status === 'AMBIGUOUS') {
+      throw new Error(`Cannot compute historical trajectory: ambiguous school memberships (${schoolContext.schoolIds.length} schools) — fail closed`);
+    }
+    const schoolId = schoolContext.schoolId;
+
     const observations = conceptId
-      ? await observationHistoryRepo.getObservationsForConcept(studentId, conceptId)
-      : await observationHistoryRepo.getObservationsForStudent(studentId);
+      ? await observationHistoryRepo.getObservationsForConcept(studentId, schoolId, conceptId)
+      : await observationHistoryRepo.getObservationsForStudent(studentId, schoolId);
 
     // Gate 06B.2B.2.1 + Gate 06C.1: Filter to ONLY trusted mastery-bearing observation types.
     // EXERCISE_COMPLETION = verified interaction, NOT mastery (currentMastery=0 sentinel).
@@ -668,7 +682,10 @@ export class LearningEvidenceEngine {
   }
 
   /**
-   * Derives canonical student evidence from observation history.
+   * Gate 06C.4.1: Derives school-scoped canonical student evidence from observation history.
+   *
+   * Resolves trusted school context from school_memberships (fail closed on NONE/AMBIGUOUS).
+   * schoolId is MANDATORY for institutional canonical state.
    *
    * GATE 06C.2: All fields derived from learning_observation_history (server-authoritative).
    * NOT from learner_memory (LEGACY_UNTRUSTED_DERIVED_STATE).
@@ -681,12 +698,23 @@ export class LearningEvidenceEngine {
       throw new Error('studentId parameter is required for getStudentEvidence');
     }
 
+    // Gate 06C.4.1: Resolve trusted school context — fail closed on NONE/AMBIGUOUS
+    const schoolContext = await authService.resolveSchoolContext();
+    if (schoolContext.status === 'NONE') {
+      throw new Error('Cannot derive canonical student evidence: no school membership');
+    }
+    if (schoolContext.status === 'AMBIGUOUS') {
+      throw new Error(`Cannot derive canonical student evidence: ambiguous school memberships (${schoolContext.schoolIds.length} schools) — fail closed`);
+    }
+    const schoolId = schoolContext.schoolId;
+
     // Get in-memory tracker for display-only metrics (time, remediation)
     const tracker = this.getOrCreateStudentTracker(studentId);
 
-    // GATE 06C.2: Derive state from observation history, NOT learner_memory
+    // GATE 06C.4.1: Derive state from school-scoped observation history, NOT learner_memory
     const canonical = await canonicalLearnerStateService.getCanonicalStudentEvidence(
       studentId,
+      schoolId,
       tracker
     );
 
@@ -754,7 +782,8 @@ export class LearningEvidenceEngine {
   }
 
   /**
-   * Generates Parent Intelligence Summary centered on simple, direct questions
+   * Gate 06C.4.1: Generates school-scoped Parent Intelligence Summary.
+   * Resolves trusted school context — fail closed on NONE/AMBIGUOUS.
    */
   public async getParentSummary(studentId: string): Promise<ParentIntelligenceSummary> {
     if (!studentId) {

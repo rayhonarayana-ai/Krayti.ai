@@ -75,7 +75,21 @@ export interface EvidenceBackedTeacherInsight {
 
 export interface ILearningObservationRepository {
   recordObservation(observation: LearningEvidenceObservation): Promise<{ success: boolean; id?: string; duplicate?: boolean }>;
-  getObservationsForStudent(studentId: string, limit?: number): Promise<LearningEvidenceObservation[]>;
-  getObservationsForConcept(studentId: string, conceptId: string, limit?: number): Promise<LearningEvidenceObservation[]>;
+  /**
+   * Gate 06C.4.1: School-scoped institutional canonical read.
+   * Paginates until exhaustion. Returns ALL observations for a student within a school.
+   * schoolId is MANDATORY — institutional canonical state is scoped by (studentId, schoolId).
+   * Observations with school_id IS NULL are excluded from institutional reads.
+   * No default limit. No silent truncation.
+   */
+  getObservationsForStudent(studentId: string, schoolId: string): Promise<LearningEvidenceObservation[]>;
+  /**
+   * Gate 06C.4.1: School-scoped institutional canonical read.
+   * Paginates until exhaustion. Returns ALL observations for a student+concept within a school.
+   * schoolId is MANDATORY — concept state is scoped by (studentId, schoolId, conceptId).
+   * Observations with school_id IS NULL are excluded from institutional reads.
+   * No default limit. No silent truncation.
+   */
+  getObservationsForConcept(studentId: string, schoolId: string, conceptId: string): Promise<LearningEvidenceObservation[]>;
   getObservationByIdempotencyKey(idempotencyKey: string): Promise<LearningEvidenceObservation | null>;
 }

@@ -171,44 +171,96 @@ export class SupabaseLearningObservationRepository implements ILearningObservati
     }
   }
 
+  /**
+   * Gate 06C.4.1: School-scoped institutional canonical read.
+   * Paginates until exhaustion. Returns ALL observations for a student within a school.
+   * schoolId is MANDATORY — institutional canonical state is scoped by (studentId, schoolId).
+   * Observations with school_id IS NULL are excluded from institutional reads.
+   * No default limit. No silent truncation.
+   */
   public async getObservationsForStudent(
     studentId: string,
-    limit: number = 50
+    schoolId: string
   ): Promise<LearningEvidenceObservation[]> {
-    const { data, error } = await supabase
-      .from('learning_observation_history')
-      .select('*')
-      .eq('student_id', studentId)
-      .order('occurred_at', { ascending: false })
-      .limit(limit);
-
-    if (error) {
-      logger.error('SupabaseLearningObservationRepository', `Failed to fetch student observations: ${error.message}`);
-      throw new Error(`Failed to fetch student observations: ${error.message}`);
+    if (!schoolId) {
+      throw new Error('schoolId is required for institutional canonical reads — fail closed');
     }
 
-    return (data || []).map(this.mapDbToModel);
+    const PAGE_SIZE = 1000;
+    let allRows: Record<string, any>[] = [];
+    let offset = 0;
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('learning_observation_history')
+        .select('*')
+        .eq('student_id', studentId)
+        .eq('school_id', schoolId)
+        .order('occurred_at', { ascending: false })
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      if (error) {
+        logger.error('SupabaseLearningObservationRepository', `Failed to fetch student observations: ${error.message}`);
+        throw new Error(`Failed to fetch student observations: ${error.message}`);
+      }
+
+      const rows = data || [];
+      allRows = allRows.concat(rows);
+
+      if (rows.length < PAGE_SIZE) {
+        break;
+      }
+      offset += PAGE_SIZE;
+    }
+
+    return allRows.map(this.mapDbToModel);
   }
 
+  /**
+   * Gate 06C.4.1: School-scoped institutional canonical read.
+   * Paginates until exhaustion. Returns ALL observations for a student+concept within a school.
+   * schoolId is MANDATORY — concept state is scoped by (studentId, schoolId, conceptId).
+   * Observations with school_id IS NULL are excluded from institutional reads.
+   * No default limit. No silent truncation.
+   */
   public async getObservationsForConcept(
     studentId: string,
-    conceptId: string,
-    limit: number = 20
+    schoolId: string,
+    conceptId: string
   ): Promise<LearningEvidenceObservation[]> {
-    const { data, error } = await supabase
-      .from('learning_observation_history')
-      .select('*')
-      .eq('student_id', studentId)
-      .eq('concept_id', conceptId)
-      .order('occurred_at', { ascending: false })
-      .limit(limit);
-
-    if (error) {
-      logger.error('SupabaseLearningObservationRepository', `Failed to fetch concept observations: ${error.message}`);
-      throw new Error(`Failed to fetch concept observations: ${error.message}`);
+    if (!schoolId) {
+      throw new Error('schoolId is required for institutional canonical reads — fail closed');
     }
 
-    return (data || []).map(this.mapDbToModel);
+    const PAGE_SIZE = 1000;
+    let allRows: Record<string, any>[] = [];
+    let offset = 0;
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('learning_observation_history')
+        .select('*')
+        .eq('student_id', studentId)
+        .eq('school_id', schoolId)
+        .eq('concept_id', conceptId)
+        .order('occurred_at', { ascending: false })
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      if (error) {
+        logger.error('SupabaseLearningObservationRepository', `Failed to fetch concept observations: ${error.message}`);
+        throw new Error(`Failed to fetch concept observations: ${error.message}`);
+      }
+
+      const rows = data || [];
+      allRows = allRows.concat(rows);
+
+      if (rows.length < PAGE_SIZE) {
+        break;
+      }
+      offset += PAGE_SIZE;
+    }
+
+    return allRows.map(this.mapDbToModel);
   }
 
   public async getObservationByIdempotencyKey(

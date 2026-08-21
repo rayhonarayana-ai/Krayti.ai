@@ -247,8 +247,13 @@ export function isTrustedCanonicalObservation(
  * Deterministic: same input produces identical output.
  * No side effects, no writes, no browser state.
  *
+ * TENANT INVARIANT (Gate 06C.4.1): This function is school-agnostic by design.
+ * The mandatory tenant boundary belongs BEFORE this function — the caller
+ * (repository/service) must obtain a school-scoped observation set before
+ * calling this function. This function does NOT filter by school_id.
+ *
  * @param conceptId canonical concept identifier
- * @param observations observations for this concept (already filtered to trusted types by caller)
+ * @param observations observations for this concept (already filtered to trusted types and scoped to school by caller)
  * @returns derived concept state
  */
 export function deriveConceptState(
@@ -345,8 +350,13 @@ export function deriveConceptState(
  * Deterministic: same input produces identical output.
  * No side effects, no writes, no browser state.
  *
+ * TENANT INVARIANT (Gate 06C.4.1): This function is school-agnostic by design.
+ * The mandatory tenant boundary belongs BEFORE this function — the caller
+ * (repository/service) must obtain a school-scoped observation set before
+ * calling this function. This function does NOT filter by school_id.
+ *
  * @param studentId student identifier
- * @param observations all observations for this student
+ * @param observations all observations for this student within a single school (school-scoped by caller)
  * @returns derived learner state across all concepts
  */
 export function deriveLearnerState(
