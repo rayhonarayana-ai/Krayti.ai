@@ -69,15 +69,20 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
           <div className="space-y-3 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/30">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>نظام البكالوريا المغربي - مسلك العلوم الرياضية أ</span>
+              <span>{summary.track || 'نظام البكالوريا المغربي'}</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
               مرحباً بك {summary.name} 👋
             </h1>
             <p className="text-emerald-100/90 text-sm leading-relaxed">
-              تلميذ بـ <strong className="text-white">{summary.schoolName}</strong> ({summary.regionalCity}).
+              {summary.schoolName && (
+                <>تلميذ بـ <strong className="text-white">{summary.schoolName}</strong>{summary.regionalCity && <> ({summary.regionalCity})</>}.</>
+              )}
+              {summary.schoolName && <br />}
               هدفك هو الحصول على معدل <strong className="text-yellow-300 font-bold">{summary.bacTargetScore}/20</strong> في البكالوريا.
-              توقعات نظام فهيم الحالية: <strong className="text-emerald-300 font-bold">{summary.currentEstimatedBacScore}/20</strong>.
+              {summary.currentEstimatedBacScore > 0 && (
+                <> توقعات نظام فهيم الحالية: <strong className="text-emerald-300 font-bold">{summary.currentEstimatedBacScore}/20</strong>.</>
+              )}
             </p>
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <button

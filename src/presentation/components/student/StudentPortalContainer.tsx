@@ -21,11 +21,12 @@ import {
   Award,
   Loader2,
   RefreshCw,
+  Building,
 } from 'lucide-react';
 import { container } from '../../../core/di/container';
 import { authService } from '../../../core/auth/auth.service';
 import { StudentPortalService } from '../../../domain/services/studentPortal.service';
-import { UserProfile } from '../../../domain/types/auth.types';
+import { UserProfile, SchoolMembershipState } from '../../../domain/types/auth.types';
 import {
   StudentDashboardSummary,
   StudentLesson,
@@ -63,6 +64,7 @@ export const StudentPortalContainer: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [schoolContext, setSchoolContext] = useState<SchoolMembershipState | null>(null);
 
   // Loaded State
   const [summary, setSummary] = useState<StudentDashboardSummary | null>(null);
@@ -83,7 +85,7 @@ export const StudentPortalContainer: React.FC = () => {
 
   const studentId = currentUser?.id || '';
 
-  // Auth listener
+  // Auth + School context listener
   useEffect(() => {
     const user = authService.getCurrentUser();
     setCurrentUser(user);
@@ -93,8 +95,65 @@ export const StudentPortalContainer: React.FC = () => {
     return unsub;
   }, []);
 
+  // Gate 06D.3: Resolve school context after auth
+  useEffect(() => {
+    if (!currentUser) {
+      setSchoolContext(null);
+      return;
+    }
+    let cancelled = false;
+    authService.resolveSchoolContext().then((ctx) => {
+      if (!cancelled) setSchoolContext(ctx);
+    });
+    return () => { cancelled = true; };
+  }, [currentUser?.id]);
+
+  // Gate 06D.3: Clear institutional state on auth transition
+  useEffect(() => {
+    setSummary(null);
+    setLessons([]);
+    setExercises([]);
+    setHomeworkList([]);
+    setExams([]);
+    setSkills([]);
+    setWeaknesses([]);
+    setRecommendations([]);
+    setFlashcards([]);
+    setAchievements([]);
+    setLeaderboard([]);
+    setAttendance([]);
+    setGrades([]);
+    setNotifications([]);
+    setAnalytics(null);
+    setIsLoading(true);
+  }, [currentUser?.id]);
+
+  // Gate 06D.3: Clear institutional state on school context change
+  useEffect(() => {
+    if (!schoolContext || schoolContext.status !== 'RESOLVED') {
+      setSummary(null);
+      setLessons([]);
+      setExercises([]);
+      setHomeworkList([]);
+      setExams([]);
+      setSkills([]);
+      setWeaknesses([]);
+      setRecommendations([]);
+      setFlashcards([]);
+      setAchievements([]);
+      setLeaderboard([]);
+      setAttendance([]);
+      setGrades([]);
+      setNotifications([]);
+      setAnalytics(null);
+    }
+  }, [schoolContext?.status]);
+
+  // Gate 06D.3: resolved schoolId for institutional data loading
+  const resolvedSchoolId = schoolContext?.status === 'RESOLVED' ? schoolContext.schoolId : undefined;
+
   const loadData = async () => {
-    if (!studentId) {
+    if (!studentId || !resolvedSchoolId) {
       setIsLoading(false);
       return;
     }
@@ -133,6 +192,17 @@ export const StudentPortalContainer: React.FC = () => {
         service.getAnalytics(studentId),
       ]);
 
+      // Gate 06D.3: Override identity fields with trusted auth data
+      if (currentUser) {
+        dashData.summary.studentId = currentUser.id;
+        // Gate 06D.3: display name is SELF_ASSERTED_PROFILE_DISPLAY_DATA
+        dashData.summary.name = currentUser.fullName || currentUser.email || 'تلميذ Qarayti';
+        dashData.summary.level = currentUser.educationLevel || undefined;
+        dashData.summary.track = currentUser.track || undefined;
+      }
+      // Gate 06D.3: Override school context from trusted membership resolution
+      dashData.summary.schoolId = resolvedSchoolId;
+
       setSummary(dashData.summary);
       setNotifications(dashData.notifications);
       setRecommendations(recData);
@@ -157,7 +227,37 @@ export const StudentPortalContainer: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [currentUser?.id, resolvedSchoolId]);
+
+  // Gate 06D.3: Auth state handling
+  if (!currentUser) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3 text-slate-500">
+        <User className="w-8 h-8 text-slate-400" />
+        <span className="text-sm font-semibold">يرجى تسجيل الدخول للوصول إلى البوابة الخاصة بالتلميذ.</span>
+      </div>
+    );
+  }
+
+  if (schoolContext?.status === 'NONE') {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3 text-slate-500">
+        <Building className="w-8 h-8 text-slate-400" />
+        <span className="text-sm font-semibold">لا يوجد انتماء مدرسي مرتبط بحسابك.</span>
+        <span className="text-xs text-slate-400">يرجى التواصل مع إدارة المدرسة لربط حسابك.</span>
+      </div>
+    );
+  }
+
+  if (schoolContext?.status === 'AMBIGUOUS') {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3 text-slate-500">
+        <Building className="w-8 h-8 text-slate-400" />
+        <span className="text-sm font-semibold">تم العثور على أكثر من انتماء مدرسي.</span>
+        <span className="text-xs text-slate-400">يرجى اختيار المدرسة الصحيحة من إعدادات الحساب.</span>
+      </div>
+    );
+  }
 
   const navTabs = [
     { id: 'dashboard', label: 'الرئيسية', icon: LayoutDashboard },

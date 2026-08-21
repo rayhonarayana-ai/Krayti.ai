@@ -138,12 +138,14 @@ export class AuthService implements IAuthService {
     const userProfile: UserProfile = {
       id: user.id,
       email: user.email || '',
+      // Gate 06D.3: display name is SELF_ASSERTED_PROFILE_DISPLAY_DATA from user_metadata
       fullName: user.user_metadata?.full_name || user.email || 'Qarayti User',
       role: trustedRole,
       preferredLanguage: EducationLanguage.ARABIC,
-      educationLevel: EducationLevel.HIGH_SCHOOL,
-      track: HighSchoolTrack.MATHEMATICS_A,
-      academicYear: '2025/2026',
+      // Gate 06D.3: educationLevel and track are NOT inferred — absent when no trusted persisted source
+      educationLevel: undefined,
+      track: undefined,
+      academicYear: undefined,
       schoolId,
       isVerified: true,
       isActive: true,

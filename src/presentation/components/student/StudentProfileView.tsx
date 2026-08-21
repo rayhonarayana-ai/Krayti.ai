@@ -38,24 +38,39 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
       {/* Massar Digital ID Card */}
       <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 text-white shadow-xl border border-slate-700/80 space-y-6">
         <div className="flex flex-col sm:flex-row items-center gap-6">
-          <img
-            src={summary.avatarUrl}
-            alt={summary.name}
-            className="w-24 h-24 rounded-full border-4 border-emerald-400 object-cover shadow-lg"
-          />
-          <div className="space-y-2 text-center sm:text-right">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/30">
-              <GraduationCap className="w-4 h-4" />
-              <span>رمز مسار الرسمى: {summary.massarId}</span>
+          {summary.avatarUrl ? (
+            <img
+              src={summary.avatarUrl}
+              alt={summary.name}
+              className="w-24 h-24 rounded-full border-4 border-emerald-400 object-cover shadow-lg"
+            />
+          ) : (
+            <div className="w-24 h-24 rounded-full border-4 border-emerald-400 bg-emerald-900/50 flex items-center justify-center text-3xl font-black text-emerald-300 shadow-lg">
+              {summary.name?.charAt(0) || '?'}
             </div>
+          )}
+          <div className="space-y-2 text-center sm:text-right">
+            {summary.massarId && (
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/30">
+                <GraduationCap className="w-4 h-4" />
+                <span>رمز مسار الرسمى: {summary.massarId}</span>
+              </div>
+            )}
             <h1 className="text-2xl font-black">{summary.name}</h1>
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 text-xs text-slate-300">
-              <span className="flex items-center gap-1">
-                <Building className="w-4 h-4 text-emerald-400" /> {summary.schoolName}
-              </span>
-              <span className="flex items-center gap-1">
-                <MapPin className="w-4 h-4 text-emerald-400" /> جهة {summary.regionalCity}
-              </span>
+              {summary.schoolName && (
+                <span className="flex items-center gap-1">
+                  <Building className="w-4 h-4 text-emerald-400" /> {summary.schoolName}
+                </span>
+              )}
+              {summary.regionalCity && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="w-4 h-4 text-emerald-400" /> جهة {summary.regionalCity}
+                </span>
+              )}
+              {!summary.schoolName && !summary.regionalCity && (
+                <span className="text-slate-400 italic">معلومات المدرسة غير متوفرة</span>
+              )}
             </div>
           </div>
         </div>
@@ -63,7 +78,7 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-white/10 text-center">
           <div className="p-3 rounded-xl bg-white/5 border border-white/10">
             <div className="text-[10px] text-slate-400">المسلك الدراسي</div>
-            <div className="text-sm font-bold text-emerald-300">علوم رياضية أ (2BAC)</div>
+            <div className="text-sm font-bold text-emerald-300">{summary.track || 'غير محدد بعد'}</div>
           </div>
           <div className="p-3 rounded-xl bg-white/5 border border-white/10">
             <div className="text-[10px] text-slate-400">هدف البكالوريا</div>

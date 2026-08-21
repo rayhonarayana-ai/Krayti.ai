@@ -16,19 +16,20 @@ import {
 export interface StudentDashboardSummary {
   studentId: string;
   name: string;
-  avatarUrl: string;
-  level: EducationLevel;
-  track: HighSchoolTrack;
-  massarId: string;
-  schoolName: string;
-  regionalCity: string;
+  avatarUrl?: string;
+  level?: EducationLevel;
+  track?: HighSchoolTrack;
+  massarId?: string;
+  schoolName?: string;
+  schoolId?: string;
+  regionalCity?: string;
   xp: number;
   coins: number;
   levelRank: number;
   levelTitle: string;
   streakDays: number;
-  bacTargetScore: number; // e.g. 17.5 / 20
-  currentEstimatedBacScore: number; // e.g. 15.8 / 20
+  bacTargetScore: number;
+  currentEstimatedBacScore: number;
   todayStudyMinutes: number;
   todayGoalMinutes: number;
   completedTasksToday: number;
