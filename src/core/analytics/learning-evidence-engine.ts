@@ -9,9 +9,9 @@
 
 import { logger } from '../logging/logger';
 import { qaraytiEventBus, QaraytiEventType } from '../integration/event-bus';
-import { longTermMemoryRepo } from '../faheem/memory/long-term-memory-interface';
 import { observationHistoryRepo } from './supabase-observation-history-repository';
 import { authService } from '../auth/auth.service';
+import { canonicalLearnerStateService } from './canonical-learner-state-service';
 import {
   HistoricalEvidenceTrajectory,
   EvidenceState,
@@ -22,13 +22,51 @@ import {
 export interface StudentLearningEvidence {
   studentId: string;
   studentName: string;
-  baselineMasteryPercent: number | null; // Initial score before adaptive learning, or null if baseline not set
-  currentMasteryPercent: number; // Live score after adaptive intervention calculated from real concept scores
-  masteryImprovementDelta: number | null; // e.g. +28% or null if baseline unavailable
-  remediationEfficacyRate: number | null; // % of gaps successfully closed (or null if no remediation data)
+
+  /**
+   * GATE 06C.2: Overall accuracy rate from verified exercise interactions.
+   * This is NOT mastery. Do not present as masteryPercent.
+   * Null when no verified interactions exist.
+   */
+  accuracyRate: number | null;
+
+  /** Total verified exercise interactions */
+  verifiedInteractionCount: number;
+
+  /** Total correct interactions */
+  correctCount: number;
+
+  /** Total incorrect interactions */
+  incorrectCount: number;
+
+  /** Number of concepts with verified interactions */
+  conceptsObservedCount: number;
+
+  /** Evidence state: NO_EVIDENCE | INSUFFICIENT_EVIDENCE | OBSERVED */
+  evidenceState: EvidenceState;
+
+  /** First observation timestamp */
+  firstObservedAt: string | null;
+
+  /** Latest observation timestamp */
+  lastObservedAt: string | null;
+
+  /** GATE 06C.2: Mastery is NOT DERIVED. Always null. */
+  mastery: null;
+
+  /** GATE 06C.2: Mastery confidence is NOT DERIVED. Always null. */
+  masteryConfidence: null;
+
+  /** Remediation efficacy rate (from in-memory tracker, display-only) */
+  remediationEfficacyRate: number | null;
+
+  /** Time spent (from in-memory tracker, display-only) */
   totalTimeSpentMinutes: number;
-  completedKosCount: number;
+
+  /** Misconceptions cleared (from in-memory tracker, display-only) */
   frequentMisconceptionsCleared: string[];
+
+  /** Last activity timestamp */
   lastEvidenceTimestamp: string;
 }
 
@@ -61,7 +99,12 @@ export interface ParentIntelligenceSummary {
   weeklyFocusSubject: string;
   actionableAdviceForParent: string;
   weeklyCompletedHours: number;
-  masteryScorePercent: number;
+  /**
+   * GATE 06C.2: Renamed from masteryScorePercent.
+   * This is accuracyRate from verified exercises, NOT mastery.
+   * Null when no verified interactions exist.
+   */
+  accuracyRatePercent: number | null;
 }
 
 export interface PlatformProductMetrics {
@@ -625,86 +668,45 @@ export class LearningEvidenceEngine {
   }
 
   /**
-   * Calculates empirical proof of student learning progression.
+   * Derives canonical student evidence from observation history.
    *
-   * GATE 06C.1 CORRECTION: currentMasteryPercent and completedKosCount are derived from
-   * learner_memory.concept_mastery_scores, which is LEGACY_UNTRUSTED_DERIVED_STATE.
-   * Historical values may be contaminated by prior untrusted writes.
-   * These metrics are NOT authoritative mastery — they are retained for backward
-   * compatibility only. A later Gate must rebuild this from observation history.
+   * GATE 06C.2: All fields derived from learning_observation_history (server-authoritative).
+   * NOT from learner_memory (LEGACY_UNTRUSTED_DERIVED_STATE).
+   *
+   * accuracyRate is derived from verified exercise interactions only.
+   * mastery is intentionally NULL — accuracy ≠ mastery.
    */
   public async getStudentEvidence(studentId: string): Promise<StudentLearningEvidence> {
     if (!studentId) {
       throw new Error('studentId parameter is required for getStudentEvidence');
     }
 
-    // GATE 06C.1 CORRECTION: learner_memory.concept_mastery_scores is LEGACY_UNTRUSTED_DERIVED_STATE.
-    // Historical values may have been written by the now-removed untrusted paths
-    // (ADAPTIVE_SKILL_MASTERED, ADAPTIVE_GAP_REMEDIATED handlers).
-    // These values are NOT authoritative mastery. They are contaminated by prior client-claimed writes.
-    // Future Gate 06C.2 must rebuild this cache from observation history or mark it explicitly untrusted.
-    // For now, this read is retained for backward compatibility with teacher/parent dashboards,
-    // but the data it returns MUST NOT be presented as verified mastery.
-    const learnerMemory = await longTermMemoryRepo.getLearnerMemory(studentId);
-    const conceptScores = learnerMemory.conceptMasteryScores || {};
-    const conceptCodes = Object.keys(conceptScores);
-
-    // 2. Calculate current mastery percentage from real concept scores
-    let currentMasteryPercent = 0;
-    if (conceptCodes.length > 0) {
-      const sum = conceptCodes.reduce((acc, code) => acc + (conceptScores[code] || 0), 0);
-      currentMasteryPercent = Math.round((sum / conceptCodes.length) * 100);
-    }
-
-    // 3. Get or create recorded tracker for this student
+    // Get in-memory tracker for display-only metrics (time, remediation)
     const tracker = this.getOrCreateStudentTracker(studentId);
 
-    // Initialize baseline on first observation if concept scores exist and baseline is not recorded
-    if (tracker.baselineMastery === undefined && conceptCodes.length > 0) {
-      tracker.baselineMastery = currentMasteryPercent;
-    }
-
-    // 4. Count completed Knowledge Objects / concepts (mastery >= 0.75)
-    const completedKosCount = conceptCodes.filter((code) => conceptScores[code] >= 0.75).length;
-
-    // 5. Remediation Efficacy Rate calculation
-    let remediationEfficacyRate: number | null = null;
-    if (tracker.remediationAttempts.length > 0) {
-      const successful = tracker.remediationAttempts.filter((r) => r.isSuccess).length;
-      remediationEfficacyRate = Math.round((successful / tracker.remediationAttempts.length) * 1000) / 10;
-    }
-
-    // 6. Misconceptions cleared
-    const misconceptionsSet = new Set<string>();
-    tracker.remediationAttempts.forEach((r) => {
-      if (r.isSuccess && r.misconceptionCleared) {
-        misconceptionsSet.add(r.misconceptionCleared);
-      }
-    });
-
-    // 7. Time spent calculation (e.g. 5 mins per exercise, 15 mins per lesson)
-    const exerciseTime = tracker.exerciseCompletions.length * 5;
-    const lessonTime = tracker.lessonCompletions.length * 15;
-    const totalTimeSpentMinutes = exerciseTime + lessonTime;
-
-    // 8. Baseline & Delta calculation
-    const baseline = tracker.baselineMastery !== undefined ? tracker.baselineMastery : null;
-    const delta = baseline !== null ? currentMasteryPercent - baseline : null;
-
-    // 9. Last evidence timestamp
-    const lastTimestamp = tracker.lastActivityTimestamp || new Date().toISOString();
+    // GATE 06C.2: Derive state from observation history, NOT learner_memory
+    const canonical = await canonicalLearnerStateService.getCanonicalStudentEvidence(
+      studentId,
+      tracker
+    );
 
     return {
-      studentId,
-      studentName: `Learner (${studentId.substring(0, 8)})`,
-      baselineMasteryPercent: baseline,
-      currentMasteryPercent,
-      masteryImprovementDelta: delta,
-      remediationEfficacyRate,
-      totalTimeSpentMinutes,
-      completedKosCount,
-      frequentMisconceptionsCleared: Array.from(misconceptionsSet),
-      lastEvidenceTimestamp: lastTimestamp,
+      studentId: canonical.studentId,
+      studentName: canonical.studentName,
+      accuracyRate: canonical.accuracyRate,
+      verifiedInteractionCount: canonical.verifiedInteractionCount,
+      correctCount: canonical.correctCount,
+      incorrectCount: canonical.incorrectCount,
+      conceptsObservedCount: canonical.conceptsObservedCount,
+      evidenceState: canonical.evidenceState,
+      firstObservedAt: canonical.firstObservedAt,
+      lastObservedAt: canonical.lastObservedAt,
+      mastery: null,
+      masteryConfidence: null,
+      remediationEfficacyRate: canonical.remediationEfficacyRate,
+      totalTimeSpentMinutes: canonical.totalTimeSpentMinutes,
+      frequentMisconceptionsCleared: canonical.frequentMisconceptionsCleared,
+      lastEvidenceTimestamp: tracker.lastActivityTimestamp || new Date().toISOString(),
     };
   }
 
@@ -761,26 +763,29 @@ export class LearningEvidenceEngine {
 
     const evidence = await this.getStudentEvidence(studentId);
 
-    const deltaText = evidence.masteryImprovementDelta !== null
-      ? `(${evidence.masteryImprovementDelta >= 0 ? '+' : ''}${evidence.masteryImprovementDelta}% في مستوى التمكن)`
-      : `(مستوى التمكن الحالي: ${evidence.currentMasteryPercent}%)`;
+    // GATE 06C.2: Use accuracyRate from canonical derived state, not contaminated mastery.
+    const accuracyText = evidence.accuracyRate !== null
+      ? `(دقة الإجابات: ${(evidence.accuracyRate * 100).toFixed(0)}%)`
+      : `(لم تُسجَّل تمارين موثقة بعد)`;
 
     const trend: 'IMPROVING' | 'STABLE' | 'NEEDS_ATTENTION' =
-      evidence.masteryImprovementDelta !== null && evidence.masteryImprovementDelta > 0
-        ? 'IMPROVING'
-        : evidence.currentMasteryPercent >= 70
-        ? 'STABLE'
+      evidence.evidenceState === 'OBSERVED' && evidence.accuracyRate !== null
+        ? evidence.accuracyRate >= 0.7
+          ? 'STABLE'
+          : 'NEEDS_ATTENTION'
         : 'NEEDS_ATTENTION';
 
     return {
       studentId,
       studentName: evidence.studentName,
-      parentOneSentenceStatus: `الطالب يحرز تقدماً في التعلم ${deltaText}.`,
+      parentOneSentenceStatus: `الطالب: ${accuracyText}.`,
       improvementTrend: trend,
       weeklyFocusSubject: 'الرياضيات والعلوم',
       actionableAdviceForParent: 'متابعة تمارين المراجعة المخصصة وحث الطالب على المذاكرة المنتظمة.',
       weeklyCompletedHours: Math.round((evidence.totalTimeSpentMinutes / 60) * 10) / 10,
-      masteryScorePercent: evidence.currentMasteryPercent,
+      accuracyRatePercent: evidence.accuracyRate !== null
+        ? Math.round(evidence.accuracyRate * 100)
+        : null,
     };
   }
 

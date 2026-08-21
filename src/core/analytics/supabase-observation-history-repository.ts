@@ -229,6 +229,7 @@ export class SupabaseLearningObservationRepository implements ILearningObservati
   }
 
   private mapDbToModel(row: Record<string, any>): LearningEvidenceObservation {
+    const metadata = row.metadata || {};
     return {
       id: row.id,
       studentId: row.student_id,
@@ -243,7 +244,8 @@ export class SupabaseLearningObservationRepository implements ILearningObservati
       currentMastery: Number(row.current_mastery),
       delta: row.delta !== null ? Number(row.delta) : null,
       confidence: Number(row.confidence),
-      metadata: row.metadata || {},
+      interactionResult: metadata.interactionResult || null,
+      metadata,
       occurredAt: row.occurred_at,
       recordedAt: row.recorded_at,
     };

@@ -411,6 +411,27 @@ async function handleLegacyEvidence(params: {
     return jsonError("Bad request", 400);
   }
 
+  // ============================================================
+  // SECURITY: EXERCISE_COMPLETION is ONLY authorized through the
+  // verified exercise ingestion path (handleExerciseVerification).
+  // Generic route must reject it — client cannot create trusted
+  // exercise observations without server-side grading.
+  // ============================================================
+  if (observationType === "EXERCISE_COMPLETION") {
+    return jsonError(
+      "EXERCISE_COMPLETION is not authorized through the generic observation route. Use the exercise verification path.",
+      403
+    );
+  }
+
+  // ============================================================
+  // SECURITY: Strip client-provided provenance fields.
+  // These are server-authoritative and must not be client-controlled.
+  // ============================================================
+  delete metadata.serverGraded;
+  delete metadata.interactionResult;
+  delete metadata.evidenceSource;
+
   const authoritativeKey = `${verifiedUserId}_${verifiedSchoolId}_${observationType}_${businessKey}`;
 
   const dbRecord = {
