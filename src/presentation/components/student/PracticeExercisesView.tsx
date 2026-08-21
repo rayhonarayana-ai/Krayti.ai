@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import {
   HelpCircle,
-  CheckCircle2,
+  Clock,
   XCircle,
   Sparkles,
   Award,
@@ -28,17 +28,23 @@ export const PracticeExercisesView: React.FC<PracticeExercisesViewProps> = ({ ex
   const [submission, setSubmission] = useState<ExerciseSubmissionResult | null>(null);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
+  /**
+   * Gate 06C.5.1 CORRECTION: Exercise verification requires server-side grading
+   * via the ingest-evidence Edge Function. This component cannot verify answers —
+   * it must not fabricate correctness, mastery, XP, or score. Fail closed with
+   * a neutral pending state. No trusted evidence is published.
+   */
   const handleSubmit = () => {
     if (!selectedExercise) return;
     setSubmission({
       exerciseId: selectedExercise.id,
       studentAnswer: userAnswer,
-      scoreObtained: selectedExercise.maxPoints,
+      scoreObtained: 0,
       maxPoints: selectedExercise.maxPoints,
-      feedbackAr: 'إجابة نموذجية ومكتملة! تم استيفاء جميع المراحل المطلوبة في عناصر الإجابة الوطنية.',
-      isCorrect: true,
-      masteryGain: 0.08,
-      xpEarned: 60,
+      feedbackAr: 'تم إرسال إجابتك. التقييم يتطلب التحقق من الخادم ولا يمكن إنجازه محلياً.',
+      isCorrect: false,
+      masteryGain: 0,
+      xpEarned: 0,
     });
   };
 
@@ -214,22 +220,19 @@ export const PracticeExercisesView: React.FC<PracticeExercisesViewProps> = ({ ex
 
               {/* Submission Result */}
               {submission && (
-                <div className="p-5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-500/30 space-y-3">
+                <div className="p-5 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-500/30 space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-bold text-sm">
-                      <CheckCircle2 className="w-5 h-5" />
-                      <span>نتيجة التقييم: {submission.scoreObtained} / {submission.maxPoints} ن</span>
+                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-bold text-sm">
+                      <Clock className="w-5 h-5" />
+                      <span>تم الإرسال — بانتظار التحقق من الخادم</span>
                     </div>
-                    <span className="text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2.5 py-0.5 rounded-full">
-                      +{submission.xpEarned} XP
-                    </span>
                   </div>
 
                   <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
                     {submission.feedbackAr}
                   </p>
 
-                  <div className="border-t border-emerald-500/20 pt-3 space-y-1">
+                  <div className="border-t border-amber-500/20 pt-3 space-y-1">
                     <div className="text-xs font-bold text-slate-900 dark:text-white">عناصر الإجابة النموذجية:</div>
                     {selectedExercise.solutionSteps?.map((step, idx) => (
                       <div key={idx} className="text-xs text-slate-600 dark:text-slate-400 font-mono">
@@ -237,7 +240,7 @@ export const PracticeExercisesView: React.FC<PracticeExercisesViewProps> = ({ ex
                       </div>
                     )) || (
                       <div className="text-xs text-slate-500 dark:text-slate-500 italic">
-                        التقييم يتم خادماً. النتيجة ستظهر بعد التحقق.
+                        لا توجد خطوات حل متاحة لهذا التمرين.
                       </div>
                     )}
                   </div>

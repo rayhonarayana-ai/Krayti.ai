@@ -1,6 +1,11 @@
 /**
  * Qarayti.ai — Teacher Portal Initial Data
  * Mock dataset for Moroccan Baccalaureate Teachers.
+ *
+ * NON_AUTHORITATIVE_UI_PROTOTYPE: All data here is fabricated — not derived from
+ * learning_observation_history or any trusted evidence source. It exists for UI
+ * development and prototyping only. Real teacher analytics will require
+ * observation-derived class-wide aggregation (not yet implemented).
  */
 
 import {

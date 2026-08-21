@@ -1,6 +1,11 @@
 /**
  * Qarayti.ai — Moroccan Baccalaureate Adaptive Curriculum Knowledge Data
  * Standardized nodes, prerequisite edges, skill tree structure, and initial item metrics.
+ *
+ * NON_AUTHORITATIVE_UI_PROTOTYPE: This file contains static curriculum reference data
+ * and mock IRT item parameters. The IRT item parameters (irt_difficulty, etc.) are
+ * mock values — the DB has real columns (curriculum_exercise_grading) that are not
+ * yet wired to the IRT engine. This data exists for UI prototyping only.
  */
 
 import { EducationLevel, HighSchoolTrack } from '../types/education.types';

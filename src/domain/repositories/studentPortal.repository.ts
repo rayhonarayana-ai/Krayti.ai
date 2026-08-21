@@ -1,6 +1,11 @@
 /**
  * Qarayti.ai — Student Portal Repository
  * Clean Architecture Repository for Student Portal Features
+ *
+ * NON_AUTHORITATIVE_UI_PROTOTYPE: This is a mock/stub implementation.
+ * All data returned here is fabricated — not derived from learning_observation_history
+ * or any trusted evidence source. It exists for UI development and prototyping only.
+ * Real learner data flows through learningEvidenceEngine.getStudentEvidence() (canonical).
  */
 
 import {
@@ -261,17 +266,18 @@ $$u_C(t) = E (1 - e^{-t/\\tau})$$`,
     return exercises;
   }
 
+  /**
+   * Gate 06C.5.1: Exercise verification requires server-side grading through
+   * the ingest-evidence Edge Function (Gate 06B.2B.2). This mock repository
+   * cannot verify answers — it must not fabricate correctness, mastery, XP,
+   * or feedback. Fail closed.
+   */
   public async submitExerciseAnswer(exerciseId: string, answer: string): Promise<ExerciseSubmissionResult> {
-    return {
-      exerciseId,
-      studentAnswer: answer,
-      scoreObtained: 2.8,
-      maxPoints: 3.0,
-      feedbackAr: 'إجابة ممتازة ومطابقة لعناصر الإجابة الرسمية للامتحان الوطني للبكالوريا!',
-      isCorrect: true,
-      masteryGain: 0.05,
-      xpEarned: 50,
-    };
+    throw new Error(
+      'submitExerciseAnswer requires server-side grading via the ingest-evidence Edge Function. ' +
+      'Exercise verification cannot be performed by the mock repository. ' +
+      'Route exercise submissions through the verified ingestion path.'
+    );
   }
 
   public async generateAiExercise(subjectName: string, topic: string, difficulty: string): Promise<StudentExercise> {
@@ -642,9 +648,9 @@ $$u_C(t) = E (1 - e^{-t/\\tau})$$`,
       },
       {
         id: 'n2',
-        title: 'تنبيه نظام فهيم الذكي',
-        message: 'تم رصد فرصة تدارك تعثر في مادة الفيزياء (دارة RC). اضغط للبدء في المراجعة الموصى بها.',
-        type: 'AI_RECOMMENDATION',
+        title: 'تحديث النظام',
+        message: 'تم تحديث منصة التعلم. راجع التمارين الجديدة المتاحة.',
+        type: 'SYSTEM',
         timestamp: '2026-08-02T16:30:00.000Z',
         read: true,
       },

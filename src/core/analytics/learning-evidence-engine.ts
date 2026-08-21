@@ -739,46 +739,20 @@ export class LearningEvidenceEngine {
   }
 
   /**
-   * Generates Teacher Analytics Insights for class-wide diagnostic action
+   * Gate 06C.5.1: Class-wide teacher insights require observation-derived
+   * aggregation across all students in a class. No such aggregation exists.
+   * Cannot fabricate class-wide analytics from trusted observation history.
+   * Fail closed — no fake mastery, no fake weakness rates, no fake vulnerabilities.
    */
   public async getTeacherInsights(classId: string): Promise<TeacherIntelligenceInsights> {
     if (!classId) {
       throw new Error('classId parameter is required for getTeacherInsights');
     }
 
-    return {
-      classId,
-      className: `الفصل الدراسي (${classId})`,
-      subject: 'Mathématiques',
-      totalStudents: 32,
-      classAvgMasteryPercent: 84.5,
-      hardestConcepts: [
-        {
-          koId: 'ko-math-002',
-          title: 'Algorithme de Dichotomie pour f(x)=0',
-          failureRatePercent: 31.2,
-          recommendedTeacherAction: 'تخصيص 15 دقيقة في بداية الحصة القادمة لشرح تحديد إشارة f(a)*f(m).',
-        },
-        {
-          koId: 'ko-math-003',
-          title: 'Théorème des Accroissements Finis (TAF)',
-          failureRatePercent: 28.5,
-          recommendedTeacherAction: 'إعادة التذكير بالتأويل الهندسي للمشتقة كمماس مواز للوتر.',
-        },
-      ],
-      problematicQuestions: [
-        {
-          questionId: 'q-math-014',
-          questionSnippet: 'Soit f une fonction continue. Montrer que f([a,b]) est un segment...',
-          discriminationIndex: 0.18,
-          issueType: 'TOO_TRICKY',
-        },
-      ],
-      classVulnerabilities: [
-        'تحديد مجالات الصورة بالدوال المتزايدة والمتناقصة قطعا',
-        'تطبيقات المبرهنات على المجالات المفتوحة',
-      ],
-    };
+    throw new Error(
+      'getTeacherInsights requires observation-derived class-wide aggregation which is not yet implemented. ' +
+      'Cannot fabricate class analytics from trusted evidence.'
+    );
   }
 
   /**
