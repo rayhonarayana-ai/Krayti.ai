@@ -29,22 +29,19 @@ export const PracticeExercisesView: React.FC<PracticeExercisesViewProps> = ({ ex
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
   /**
-   * Gate 06C.5.1 CORRECTION: Exercise verification requires server-side grading
+   * Gate 06D.2: Exercise verification requires server-side grading
    * via the ingest-evidence Edge Function. This component cannot verify answers —
-   * it must not fabricate correctness, mastery, XP, or score. Fail closed with
-   * a neutral pending state. No trusted evidence is published.
+   * it must not fabricate correctness, mastery, XP, or score.
+   * Fail closed with an explicit PENDING_VERIFICATION state.
+   * No trusted evidence is published.
    */
   const handleSubmit = () => {
     if (!selectedExercise) return;
     setSubmission({
+      status: 'PENDING_VERIFICATION',
       exerciseId: selectedExercise.id,
       studentAnswer: userAnswer,
-      scoreObtained: 0,
-      maxPoints: selectedExercise.maxPoints,
-      feedbackAr: 'تم إرسال إجابتك. التقييم يتطلب التحقق من الخادم ولا يمكن إنجازه محلياً.',
-      isCorrect: false,
-      masteryGain: 0,
-      xpEarned: 0,
+      feedbackAr: 'تم إرسال إجابتك وهي بانتظار التحقق من الخادم.',
     });
   };
 

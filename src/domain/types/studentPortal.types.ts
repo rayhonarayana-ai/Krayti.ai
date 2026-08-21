@@ -72,16 +72,30 @@ export interface StudentExercise {
   isAiGenerated?: boolean;
 }
 
-export interface ExerciseSubmissionResult {
-  exerciseId: string;
-  studentAnswer: string;
-  scoreObtained: number;
-  maxPoints: number;
-  feedbackAr: string;
-  isCorrect: boolean;
-  masteryGain: number;
-  xpEarned: number;
-}
+/**
+ * Gate 06D.2: Explicit exercise verification state.
+ * An ungraded answer is NOT an incorrect answer.
+ * PENDING_VERIFICATION must not carry any grading authority.
+ * GRADED must carry a genuine server-verified result.
+ */
+export type ExerciseSubmissionResult =
+  | {
+      status: 'PENDING_VERIFICATION';
+      exerciseId: string;
+      studentAnswer: string;
+      feedbackAr: string;
+    }
+  | {
+      status: 'GRADED';
+      exerciseId: string;
+      studentAnswer: string;
+      scoreObtained: number;
+      maxPoints: number;
+      feedbackAr: string;
+      isCorrect: boolean;
+      masteryGain: number;
+      xpEarned: number;
+    };
 
 export interface HomeworkAssignment {
   id: string;

@@ -67,13 +67,15 @@ export class StudentPortalService {
       throw new Error('Authentication required: no authenticated student identity available');
     }
     const activeSubmissionId = submissionId || `sub_${activeStudentId}_${exerciseId}_${answer}`;
-    qaraytiEventBus.publish(QaraytiEventType.STUDENT_EXERCISE_COMPLETED, activeStudentId, 'STUDENT', {
-      exerciseId,
-      answer,
-      isCorrect: res.isCorrect,
-      studentId: activeStudentId,
-      submissionId: activeSubmissionId,
-    });
+    if (res.status === 'GRADED') {
+      qaraytiEventBus.publish(QaraytiEventType.STUDENT_EXERCISE_COMPLETED, activeStudentId, 'STUDENT', {
+        exerciseId,
+        answer,
+        isCorrect: res.isCorrect,
+        studentId: activeStudentId,
+        submissionId: activeSubmissionId,
+      });
+    }
     return res;
   }
 
