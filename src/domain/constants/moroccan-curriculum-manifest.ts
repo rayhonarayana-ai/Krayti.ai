@@ -157,6 +157,7 @@ export const SOURCE_CLASSIFICATIONS: Record<SourceClassification, { labelAr: str
   OFFICIAL_EXAM: { labelAr: 'official exam', labelFr: 'Examen officiel', trustedForPublishing: true },
   OFFICIAL_CURRICULUM_DOCUMENT: { labelAr: 'official curriculum document', labelFr: 'Document curriculaire officiel', trustedForPublishing: true },
   OFFICIAL_TEXTBOOK_OR_GUIDE: { labelAr: 'official textbook', labelFr: 'Manuel ou guide officiel', trustedForPublishing: true },
+  OFFICIAL_PUBLIC_INSTITUTION: { labelAr: 'official public institution', labelFr: 'Institution publique officielle', trustedForPublishing: true },
   AUTHORIZED_REFERENCE: { labelAr: 'authorized reference', labelFr: 'Référence autorisée', trustedForPublishing: true },
   SECONDARY_REFERENCE: { labelAr: 'secondary reference', labelFr: 'Référence secondaire', trustedForPublishing: false },
   INTERNAL_DRAFT: { labelAr: 'internal draft', labelFr: 'Brouillon interne', trustedForPublishing: false },
