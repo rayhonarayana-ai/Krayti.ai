@@ -895,3 +895,175 @@ export interface CrossReferenceComponentEvidence {
   readonly primaryArtifactConfirmation: 'NOT_VERIFIED' | 'VERIFIED';
   readonly classification: string;
 }
+
+// ============================================================
+// PRIMARY ARTIFACT ACCESS RECOVERY + AUTHENTICITY (Gate 07C.6.1)
+// ============================================================
+// Forensic evidence handling for recovering and authenticating the
+// machine-readable copy of the 2021 primary curriculum artifact.
+//
+// RECOVERY != VERIFICATION. A recovered artifact is identified and
+// authenticated before ANY content claim may inherit its authority.
+// Authenticity of the recovered copy is separate from retrieval-channel
+// authority: a mirror host can deliver a genuine artifact WITHOUT being
+// the issuer. Issuer identity must come from artifact-internal and
+// independent corroboration, never solely from the retrieval host.
+
+export type ArtifactAccessState =
+  | 'NOT_SEARCHED'
+  | 'SEARCHING'
+  | 'RECOVERED_UNVERIFIED'
+  | 'RECOVERED_AUTHENTICATED'
+  | 'RECOVERED_PARTIAL'
+  | 'BLOCKED_BY_ARTIFACT_ACCESS'
+  | 'IDENTITY_CONFLICT';
+
+export type RecoveryOutcomeStatus =
+  | 'RECOVERED_FULL_ARTIFACT'
+  | 'RECOVERED_PARTIAL_ARTIFACT'
+  | 'METADATA_ONLY'
+  | 'SNIPPET_ONLY'
+  | 'HTML_WRAPPER_ONLY'
+  | 'DOWNLOAD_FAILED'
+  | 'ACCESS_BLOCKED_AUTHENTICATION_REQUIRED'
+  | 'ACCESS_BLOCKED_ANTI_BOT'
+  | 'DEAD_LINK'
+  | 'REDIRECT_UNRESOLVED'
+  | 'NOT_TARGET_ARTIFACT'
+  | 'UNKNOWN';
+
+export type RecoveryChannelType =
+  | 'OFFICIAL_ISSUER_DIRECT'
+  | 'MIRROR_HOST'
+  | 'FILE_HOSTING'
+  | 'DOCUMENT_SHARING_PLATFORM'
+  | 'AUTH_KEYWORD_REFERENCE'
+  | 'SEARCH_INDEX';
+
+export type RecoveryChannelAuthority =
+  | 'ISSUER'
+  | 'AUTHORIZED_REPOSITORY'
+  | 'HOST_OR_MIRROR'
+  | 'SECONDARY_PLATFORM'
+  | 'UNKNOWN';
+
+export interface ArtifactRecoveryCandidate {
+  readonly candidateId: string;
+  readonly label: string;
+  readonly channelType: RecoveryChannelType;
+  readonly channelAuthority: RecoveryChannelAuthority;
+  readonly url: string;
+  readonly outcome: RecoveryOutcomeStatus;
+  readonly sizeBytes?: number;
+  readonly sha256?: string;
+  readonly pageCount?: number;
+  readonly evidenceDescription: string;
+  readonly isPrimarySatisfying: boolean;
+}
+
+export type ArtifactAuthenticityClass =
+  | 'ARTIFACT_AUTHENTICITY_VERIFIED'
+  | 'ARTIFACT_AUTHENTICITY_STRONGLY_SUPPORTED'
+  | 'ARTIFACT_AUTHENTICITY_PARTIALLY_SUPPORTED'
+  | 'ARTIFACT_AUTHENTICITY_UNRESOLVED'
+  | 'ARTIFACT_AUTHENTICITY_CONFLICT';
+
+export interface AuthenticityEvidence {
+  readonly factor: string;
+  readonly finding: string;
+  readonly source: string;
+  readonly directArtifactObservation: boolean;
+}
+
+export interface ArtifactFingerprint {
+  readonly sha256: string;
+  readonly sizeBytes: number;
+  readonly pageCount: number;
+  readonly pdfHeader: string;
+  readonly producer: string;
+  readonly creator: string;
+  readonly titleMetadata: string | undefined;
+  readonly coverPageIsImage: boolean;
+  readonly lastPageIsImage: boolean;
+  readonly bodyHasNativeTextLayer: boolean;
+  readonly arabicTextEncoding: 'CID_HEX_UNMAPPED' | 'DECODABLE' | 'NOT_ASSESSED';
+  readonly frenchTextDecodable: boolean;
+}
+
+export interface AuthenticityAttestation {
+  readonly artifactId: string;
+  readonly classification: ArtifactAuthenticityClass;
+  readonly recoveredCopyCount: number;
+  readonly byteIdenticalChannels: number;
+  readonly primarySha256: string;
+  readonly fingerprints: readonly ArtifactFingerprint[];
+  readonly evidenceItems: readonly AuthenticityEvidence[];
+  readonly issuerAttributionBasis: string;
+  readonly nonIssuerBasis: string;
+  readonly retrievalAuthorityNote: string;
+  readonly verdictNote: string;
+}
+
+export type CurrentnessConclusion =
+  | 'NO_NEWER_VERIFIED_SOURCE_FOUND'
+  | 'NEWER_VERIFIED_SOURCE_FOUND'
+  | 'NEWER_REPORTED_NOT_VERIFIED'
+  | 'CURRENTNESS_UNRESOLVED';
+
+export interface CurrentnessSearchResult {
+  readonly conclusion: CurrentnessConclusion;
+  readonly searchYearSpan: string;
+  readonly newerFullOfficialReplacementFound: boolean;
+  readonly basis: string;
+  readonly notes: string;
+}
+
+export type PrimaryComponentValidationStatus =
+  | 'VALIDATED_FROM_PRIMARY_ARTIFACT'
+  | 'CORROBORATED_BY_PRIMARY_STRUCTURE'
+  | 'PARTIALLY_ADDRESSED'
+  | 'NOT_CHECKED'
+  | 'BLOCKED_BY_TEXT_ENCODING';
+
+export interface PrimaryComponentValidationResult {
+  readonly subjectCode: string;
+  readonly componentCode: string;
+  readonly nameAr: string;
+  readonly nameFr: string;
+  readonly validationStatus: PrimaryComponentValidationStatus;
+  readonly primaryArtifactConfirmation: 'NOT_VERIFIED' | 'VERIFIED';
+  readonly evidenceDescription: string;
+}
+
+export interface PageMapPrimaryReVerification {
+  readonly entryIndex: number;
+  readonly pageRange: string;
+  readonly sectionTitle: string;
+  readonly priorLocatorAuthority: PageMapLocatorAuthority;
+  readonly reVerificationStatus: 'PRIMARY_ARTIFACT_CORROBORATED' | 'PRIMARY_ARTIFACT_REFINED' | 'NOT_RE_VERIFIED' | 'CONFLICT';
+  readonly directObservedPrintedRange?: string;
+  readonly note: string;
+}
+
+export interface GapReEvaluation {
+  readonly gapId: string;
+  readonly priorStatus: string;
+  readonly afterStatus: string;
+  readonly evidenceDescription: string;
+  readonly unchanged: boolean;
+}
+
+export interface ArtifactRecoveryVerdict {
+  readonly gate: string;
+  readonly artifactAccessState: ArtifactAccessState;
+  readonly primaryRecoveryOutcome: RecoveryOutcomeStatus;
+  readonly authenticity: ArtifactAuthenticityClass;
+  readonly fullArtifactRecovered: boolean;
+  readonly artifactAuthenticated: boolean;
+  readonly deepExtractionUnlocked: boolean;
+  readonly contentVerificationUnlocked: boolean;
+  readonly primaryValidatedComponents: number;
+  readonly notCheckedComponents: number;
+  readonly verdict: 'PASS' | 'PARTIAL' | 'FAIL';
+  readonly summary: string;
+}
