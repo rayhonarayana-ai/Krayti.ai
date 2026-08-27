@@ -238,6 +238,10 @@ export type ClaimType =
   | 'SUBJECT_BY_GRADE'
   | 'OFFICIAL_SUBJECT_NAMES'
   | 'CURRICULUM_DOMAINS'
+  | 'DOMAIN_STRUCTURE'
+  | 'SUBJECT_NAME'
+  | 'SUBJECT_APPLICABILITY'
+  | 'SECTION_SCOPE'
   | 'PROGRAM_ORGANIZATION'
   | 'COMPETENCIES'
   | 'UNITS_CONTENT'
@@ -245,8 +249,7 @@ export type ClaimType =
   | 'ASSESSMENT_RULES'
   | 'COEFFICIENTS'
   | 'IMPLEMENTATION_DETAILS'
-  | 'FRENCH_INTRODUCTION_GRADE'
-  | 'SUBJECT_NAME';
+  | 'FRENCH_INTRODUCTION_GRADE';
 
 export interface ClaimProvenance {
   readonly claimType: ClaimType;
@@ -335,3 +338,201 @@ export interface AssembledCanonicalClaim {
   readonly latestSourceId: string;
   readonly notes?: string;
 }
+
+// ============================================================
+// EXTRACTION METHOD (Gate 07C.3)
+// ============================================================
+
+export type ExtractionMethod =
+  | 'DIRECT_QUOTE'
+  | 'DIRECT_STRUCTURED_EXTRACTION'
+  | 'NORMALIZED_FROM_SOURCE'
+  | 'DERIVED_STRUCTURAL_MAPPING'
+  | 'HUMAN_REVIEW_REQUIRED'
+  | 'OCR_EXTRACTED';
+
+// ============================================================
+// NORMALIZATION CLASSIFICATION (Gate 07C.3)
+// ============================================================
+
+export type NormalizationClassification =
+  | 'DIRECT'
+  | 'LOSSLESS_NORMALIZATION'
+  | 'DERIVED'
+  | 'AMBIGUOUS'
+  | 'UNMAPPABLE'
+  | 'REVIEW_REQUIRED';
+
+// ============================================================
+// SOURCE LOCATOR PRECISION (Gate 07C.3)
+// ============================================================
+
+export type LocatorPrecision =
+  | 'EXACT_PAGE'
+  | 'SECTION_ONLY'
+  | 'DOCUMENT_LEVEL'
+  | 'UNKNOWN';
+
+// ============================================================
+// SOURCE LOCATOR (Gate 07C.3)
+// ============================================================
+
+export interface CurriculumSourceLocator {
+  readonly precision: LocatorPrecision;
+  readonly page?: string;
+  readonly section?: string;
+  readonly heading?: string;
+  readonly table?: string;
+  readonly paragraph?: string;
+  readonly artifactAnchor?: string;
+  readonly notes?: string;
+}
+
+// ============================================================
+// EXTRACTION CONTENT STATUS (Gate 07C.3)
+// ============================================================
+
+export type ExtractionContentStatus =
+  | 'NOT_EXTRACTED'
+  | 'PARTIALLY_EXTRACTED'
+  | 'EXTRACTED_UNVERIFIED'
+  | 'REVIEW_REQUIRED'
+  | 'CONTENT_VERIFIED'
+  | 'PUBLISHED';
+
+// ============================================================
+// CURRICULUM EXTRACTION CLAIM (Gate 07C.3)
+// ============================================================
+
+export interface CurriculumExtractionClaim {
+  readonly id: string;
+  readonly scopeKey: string;
+  readonly educationSystemCode: string;
+  readonly stageCode: string;
+  readonly gradeCode: string;
+  readonly subjectCode: string;
+
+  readonly claimType: ClaimType;
+
+  readonly sourceId: string;
+  readonly sourceVersionId?: string;
+  readonly sourceClassification: SourceClassification;
+
+  readonly sourceLocator: CurriculumSourceLocator;
+
+  readonly originalTextAr?: string;
+  readonly originalTextFr?: string;
+  readonly normalizedValue: string;
+
+  readonly extractionMethod: ExtractionMethod;
+  readonly normalizationClassification: NormalizationClassification;
+
+  readonly verificationState: VerificationState;
+  readonly contentStatus: ExtractionContentStatus;
+  readonly confidence: 'HIGH' | 'MODERATE' | 'LOW' | 'UNVERIFIED';
+
+  readonly temporalApplicability: {
+    readonly effectiveFrom?: string;
+    readonly effectiveTo?: string;
+    readonly academicYearFrom?: string;
+    readonly academicYearUntil?: string;
+    readonly publicationDateVerified?: boolean;
+    readonly effectiveDateConfidence: TemporalConfidence;
+  };
+
+  readonly supersessionState?: {
+    readonly isSuperseded: boolean;
+    readonly supersedingSourceId?: string;
+    readonly scopeSpecific: boolean;
+  };
+
+  readonly notes?: string;
+}
+
+// ============================================================
+// CURRICULUM CONTENT CONFLICT (Gate 07C.3)
+// ============================================================
+
+export type ConflictResolutionStatus =
+  | 'UNRESOLVED'
+  | 'HIGHER_AUTHORITY_SOURCE'
+  | 'LATER_EQUAL_AUTHORITY_SOURCE'
+  | 'SCOPE_SPECIFIC_OVERRIDE'
+  | 'HUMAN_REVIEW_REQUIRED';
+
+export interface CurriculumClaimConflict {
+  readonly id: string;
+  readonly claimScope: string;
+  readonly gradeCode: string;
+  readonly subjectCode: string;
+  readonly candidateSourceIds: readonly string[];
+  readonly conflictingValues: readonly string[];
+  readonly authorityComparison: string;
+  readonly temporalComparison?: string;
+  readonly resolutionStatus: ConflictResolutionStatus;
+  readonly resolutionReason?: string;
+  readonly notes?: string;
+}
+
+// ============================================================
+// EXTRACTION CONTENT METRICS (Gate 07C.3)
+// ============================================================
+// extractionMethod and normalizationClassification are SEPARATE DIMENSIONS,
+// not mutually exclusive buckets. One claim has both an extractionMethod
+// AND a normalizationClassification. The distributions below are
+// independent tallies, not components of a single total.
+
+export interface ExtractionContentMetrics {
+  readonly totalClaims: number;
+
+  // Source-level coverage (separate from extracted claims)
+  readonly gradeSubjectCellsSourceVerified: number;
+
+  // Distribution by extractionMethod (dimension 1)
+  readonly byExtractionMethod: {
+    readonly DIRECT_QUOTE: number;
+    readonly DIRECT_STRUCTURED_EXTRACTION: number;
+    readonly NORMALIZED_FROM_SOURCE: number;
+    readonly DERIVED_STRUCTURAL_MAPPING: number;
+    readonly HUMAN_REVIEW_REQUIRED: number;
+    readonly OCR_EXTRACTED: number;
+  };
+
+  // Distribution by normalizationClassification (dimension 2)
+  readonly byNormalizationClassification: {
+    readonly DIRECT: number;
+    readonly LOSSLESS_NORMALIZATION: number;
+    readonly DERIVED: number;
+    readonly AMBIGUOUS: number;
+    readonly UNMAPPABLE: number;
+    readonly REVIEW_REQUIRED: number;
+  };
+
+  // Distribution by verificationState (dimension 3)
+  readonly byVerificationState: {
+    readonly UNVERIFIED: number;
+    readonly REVIEW_REQUIRED: number;
+    readonly VERIFIED: number;
+    readonly REJECTED: number;
+  };
+
+  // Distribution by contentStatus (dimension 4)
+  readonly byContentStatus: {
+    readonly NOT_EXTRACTED: number;
+    readonly PARTIALLY_EXTRACTED: number;
+    readonly EXTRACTED_UNVERIFIED: number;
+    readonly REVIEW_REQUIRED: number;
+    readonly CONTENT_VERIFIED: number;
+    readonly PUBLISHED: number;
+  };
+}
+
+// ============================================================
+// HISTORICAL APPLICABILITY CONFIDENCE (Gate 07C.3)
+// ============================================================
+
+export type ApplicabilityConfidence =
+  | 'APPLICABLE_VERIFIED'       // Source explicitly states effective period
+  | 'APPLICABLE_INFERRED'       // Inferred from publication date + context
+  | 'APPLICABILITY_UNKNOWN'     // No evidence for or against applicability
+  | 'NOT_APPLICABLE_VERIFIED';  // Source explicitly does not apply to this period
