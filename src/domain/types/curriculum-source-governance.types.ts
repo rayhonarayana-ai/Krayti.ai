@@ -695,3 +695,150 @@ export interface StructuralExtractionMetrics {
   readonly denominatorKnownCount: number;
   readonly denominatorUnknownCount: number;
 }
+
+// ============================================================
+// DENOMINATOR CONFIDENCE (Gate 07C.5)
+// ============================================================
+
+export type DenominatorConfidence =
+  | 'VERIFIED'    // Source explicitly establishes complete enumerable set
+  | 'SUPPORTED'   // Strong structural evidence, minor ambiguity remains
+  | 'PARTIAL'     // Some expected structure known but complete set not proven
+  | 'UNKNOWN';    // No defensible denominator
+
+// ============================================================
+// DENOMINATOR TYPE (Gate 07C.5)
+// ============================================================
+// The structural entity that serves as the completeness unit for a
+// given grade × subject cell. Different subjects may use different
+// denominator types — forced uniformity is forbidden.
+
+export type DenominatorType =
+  | 'GRADE_SECTION'           // Only grade-level section exists (no finer structure found)
+  | 'DOMAIN_COMPONENT'        // Subject organizes around domain components
+  | 'COMPETENCY_GROUP'        // Competency-based organization
+  | 'AXE'                     // Mathematical/scientific axes
+  | 'ACTIVITY'                // Activity-based (e.g., scientific activities)
+  | 'STRAND'                  // Skill strand organization
+  | 'COMPOSANTE'              // French composante structure
+  | 'NONE_IDENTIFIED'         // Source examined, no denominator found
+  | 'NOT_APPLICABLE';         // Denominator concept not applicable
+
+// ============================================================
+// COMPLETENESS STATUS (Gate 07C.5)
+// ============================================================
+
+export type CompletenessStatus =
+  | 'DENOMINATOR_UNKNOWN'
+  | 'DENOMINATOR_PARTIAL'
+  | 'EXTRACTION_NOT_STARTED'
+  | 'EXTRACTION_PARTIAL'
+  | 'EXTRACTION_MATCHES_DENOMINATOR'
+  | 'REVIEW_REQUIRED'
+  | 'STRUCTURE_COMPLETE_VERIFIED';
+
+// ============================================================
+// CELL SCAN STATUS (Gate 07C.5)
+// ============================================================
+// Distinguishes document scanning from curriculum completeness.
+
+export type CellScanStatus =
+  | 'NOT_SCANNED'
+  | 'SECTION_LOCATED'
+  | 'SECTION_SCANNED'
+  | 'STRUCTURE_MAPPED'
+  | 'STRUCTURE_EXTRACTED';
+
+// ============================================================
+// CURRICULUM EXTRACTION DENOMINATOR (Gate 07C.5)
+// ============================================================
+// Source-derived denominator for a specific grade × subject cell.
+
+export interface CurriculumExtractionDenominator {
+  readonly id: string;
+  readonly educationSystemCode: string;
+  readonly stageCode: string;
+  readonly gradeCode: string;
+  readonly subjectCode: string;
+
+  readonly denominatorType: DenominatorType;
+  readonly expectedCount: number | undefined;
+
+  readonly sourceId: string;
+  readonly sourceVersionId: string;
+  readonly sourceLocator: CurriculumSourceLocator;
+
+  readonly evidenceMethod: string;
+  readonly confidence: DenominatorConfidence;
+
+  readonly completenessLevel: CompletenessStatus;
+
+  readonly verificationState: VerificationState;
+  readonly notes: string;
+}
+
+// ============================================================
+// GRADE × SUBJECT COMPLETENESS CELL (Gate 07C.5)
+// ============================================================
+
+export interface GradeSubjectCompletenessCell {
+  readonly gradeCode: string;
+  readonly subjectCode: string;
+
+  readonly sourcePresence: 'PRESENT' | 'ABSENT' | 'UNCERTAIN';
+  readonly sourceSectionLocated: boolean;
+  readonly sourceSectionScanned: CellScanStatus;
+
+  readonly denominatorType: DenominatorType;
+  readonly denominatorConfidence: DenominatorConfidence;
+  readonly expectedCount: number | undefined;
+  readonly extractedCount: number;
+  readonly reviewRequiredCount: number;
+  readonly knownGapCount: number;
+
+  readonly completenessRatio: number | undefined;
+  readonly completenessStatus: CompletenessStatus;
+
+  readonly denominatorId: string | undefined;
+  readonly notes: string;
+}
+
+// ============================================================
+// SUBJECT STRUCTURAL PROFILE (Gate 07C.5)
+// ============================================================
+
+export type HierarchyDepth = 'SURFACE' | 'MODERATE' | 'DEEP';
+
+export interface SubjectStructuralProfile {
+  readonly subjectCode: string;
+  readonly subjectNameAr: string;
+  readonly subjectNameFr: string;
+  readonly domainCode: string;
+
+  readonly sourceOrganization: string;
+  readonly sourceStructuralTerminology: string;
+  readonly gradeDifferentiation: string;
+  readonly denominatorCandidateType: DenominatorType;
+  readonly locatorRange: string;
+  readonly hierarchyDepth: HierarchyDepth;
+  readonly reviewStatus: string;
+}
+
+// ============================================================
+// GRADE COMPLETENESS PROFILE (Gate 07C.5)
+// ============================================================
+
+export type CellCompletenessCategory =
+  | 'VERIFIED' | 'SUPPORTED' | 'PARTIAL' | 'UNKNOWN' | 'NOT_APPLICABLE';
+
+export interface GradeCompletenessProfile {
+  readonly gradeCode: string;
+  readonly subjects: readonly string[];
+  readonly totalCells: number;
+  readonly denominatorReadyCells: number;
+  readonly partialCells: number;
+  readonly blockedCells: number;
+  readonly reviewQueueCount: number;
+  readonly cellStatuses: Record<string, CellCompletenessCategory>;
+  readonly notes: string;
+}
