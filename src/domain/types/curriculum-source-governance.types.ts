@@ -716,6 +716,7 @@ export type DenominatorConfidence =
 export type DenominatorType =
   | 'GRADE_SECTION'           // Only grade-level section exists (no finer structure found)
   | 'DOMAIN_COMPONENT'        // Subject organizes around domain components
+  | 'COMPONENT'               // Gate 07C.6: subject-level components (écoute, lecture, écriture, etc.)
   | 'COMPETENCY_GROUP'        // Competency-based organization
   | 'AXE'                     // Mathematical/scientific axes
   | 'ACTIVITY'                // Activity-based (e.g., scientific activities)
@@ -771,6 +772,10 @@ export interface CurriculumExtractionDenominator {
   readonly evidenceMethod: string;
   readonly confidence: DenominatorConfidence;
 
+  // Gate 07C.6: explicit evidence authority separation
+  readonly evidenceClass: EvidenceClass;
+  readonly primaryArtifactConfirmation: 'NOT_VERIFIED' | 'VERIFIED';
+
   readonly completenessLevel: CompletenessStatus;
 
   readonly verificationState: VerificationState;
@@ -807,7 +812,7 @@ export interface GradeSubjectCompletenessCell {
 // SUBJECT STRUCTURAL PROFILE (Gate 07C.5)
 // ============================================================
 
-export type HierarchyDepth = 'SURFACE' | 'MODERATE' | 'DEEP';
+export type HierarchyDepth = 'SURFACE' | 'PARTIAL' | 'MODERATE' | 'DEEP';
 
 export interface SubjectStructuralProfile {
   readonly subjectCode: string;
@@ -841,4 +846,52 @@ export interface GradeCompletenessProfile {
   readonly reviewQueueCount: number;
   readonly cellStatuses: Record<string, CellCompletenessCategory>;
   readonly notes: string;
+}
+
+// ============================================================
+// EVIDENCE CLASS & AUTHORITY SEPARATION (Gate 07C.6)
+// ============================================================
+// Every curricular claim must identify its evidence class explicitly.
+// Authority separation invariant:
+//   ORIGINAL CURRICULUM ARTIFACT != PUBLIC CROSS-REFERENCE != RETRIEVAL HOST
+// A public cross-reference supports investigation but CANNOT silently
+// inherit OFFICIAL_CURRICULUM_DOCUMENT authority from the 2021 artifact.
+
+export type PrimaryArtifactAccessState =
+  | 'AVAILABLE'                       // Direct artifact access obtained
+  | 'BLOCKED_BY_ARTIFACT_ACCESS'      // No PDF; Calaméo 404; Scribd auth wall
+  | 'NOT_REQUIRED';
+
+export type EvidenceClass =
+  | 'PRIMARY_ARTIFACT'                // Directly from the authenticated 2021 curriculum artifact
+  | 'OFFICIAL_CROSS_REFERENCE'        // Government/institutional source (issuer is the authority)
+  | 'SECONDARY_CROSS_REFERENCE'       // Teacher portals, academic papers, summaries
+  | 'RETRIEVAL_HOST';                 // The delivery mechanism only (Calaméo, Scribd, Drive)
+
+export type PageMapLocatorAuthority =
+  | 'PRIMARY_ARTIFACT_PAGE_VERIFIED'  // Direct artifact access confirmed the page
+  | 'CROSS_REFERENCE_LOCATOR'         // From secondary descriptions (no direct artifact access)
+  | 'SECTION_REFERENCE'               // Section-level reference, not exact page
+  | 'EXTERNAL_PAGE_REFERENCE';        // Page stated by an external host/source
+
+export type DeepExtractionStatus =
+  | 'DEEP_EXTRACTION_COMPLETE'        // Direct artifact deep extraction finished
+  | 'BLOCKED_BY_ARTIFACT_ACCESS'      // Evidence-access limitation, NOT a code failure
+  | 'CROSS_REFERENCE_SUPPORTED'       // Structure supported by public cross-reference only
+  | 'NOT_STARTED';
+
+// Structure observed via public sources; NOT a direct-artifact-denominated count.
+export interface CrossReferenceComponentEvidence {
+  readonly subjectCode: string;
+  readonly componentCode: string;
+  readonly nameAr: string;
+  readonly nameFr: string;
+  readonly scope: string;
+  readonly publicSource: string;
+  readonly publisherOrIssuer: string;
+  readonly retrievalHost: string;
+  readonly evidenceClass: Exclude<EvidenceClass, 'PRIMARY_ARTIFACT'>;
+  readonly confidence: 'CONFIRMED' | 'STRONGLY_SUPPORTED' | 'INFERRED' | 'UNCERTAIN';
+  readonly primaryArtifactConfirmation: 'NOT_VERIFIED' | 'VERIFIED';
+  readonly classification: string;
 }

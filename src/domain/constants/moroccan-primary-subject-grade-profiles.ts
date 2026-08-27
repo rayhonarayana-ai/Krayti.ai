@@ -1,7 +1,16 @@
 /**
- * Qarayti.ai - Gate 07C.5: Moroccan Primary Curriculum Subject & Grade Profiles
+ * Qarayti.ai - Gate 07C.5/07C.6: Moroccan Primary Curriculum Subject & Grade Profiles
  *
  * Subject structural profiles (9 subjects) and grade completeness profiles (P1-P6).
+ *
+ * GATE 07C.6 UPDATE:
+ *   Deep extraction from public sources confirmed internal structure for 5 subjects:
+ *     ARABIC: 3 components (listening/speaking, reading, writing)
+ *     FRENCH: 2 components (reading, written production)
+ *     MATH: 3 components (numbers/arithmetic, geometry/measurement, data)
+ *     SCIENCE: 4 components (life/earth, physical, space, technology)
+ *     CIVIC_EDUCATION: 3 components (history, geography, citizenship) — P4-P6
+ *   Competency model confirmed: annual competency + entry/exit profiles + sub-competencies.
  *
  * RULES:
  *   - Profiles describe source-derived structure only
@@ -14,12 +23,18 @@
 import type {
   SubjectStructuralProfile,
   GradeCompletenessProfile,
-  DenominatorType,
   CellCompletenessCategory,
 } from '../types/curriculum-source-governance.types';
 
 import { PRIMARY_GRADE_CODES } from './curriculum-architecture.constants';
 import { COMPLETENESS_CELLS } from './moroccan-primary-completeness-registry';
+import {
+  getSubjectComponents,
+  COMPONENT_COUNTS,
+  COMPETENCY_MODEL_ENTRIES,
+  COMPETENCY_SUB_ELEMENTS,
+  type DeepCurriculumElement,
+} from './moroccan-primary-deep-structure';
 
 // ── SOURCE CONSTANTS ─────────────────────────────────────────
 
@@ -42,129 +57,84 @@ const OFFICIAL_SUBJECTS = [
 
 // ============================================================
 // SUBJECT STRUCTURAL PROFILES (Gate 07C.5 §20-26)
+// Updated in Gate 07C.6 with deep extraction findings
 // ============================================================
-// Each profile records what the artifact establishes about the
-// subject's structural organization. No fabrication.
 
-export const SUBJECT_STRUCTURAL_PROFILES: readonly SubjectStructuralProfile[] = [
-  {
-    subjectCode: 'ARABIC',
-    subjectNameAr: 'اللغة العربية',
-    subjectNameFr: 'Arabe',
-    domainCode: 'LANGUAGES',
-    sourceOrganization: 'Grade sections within Languages domain. Each grade has a dedicated Arabic section. Within-grade organization: not yet extracted. Expected to include reading, writing, and language components based on domain context.',
-    sourceStructuralTerminology: 'اللغة العربية (Arabic Language). Internal components likely include: القراءة (Reading), الكتابة (Writing), اللغة (Language). Not confirmed by extraction.',
-    gradeDifferentiation: 'Present in all 6 grades (P1-P6). Each grade has a separate section within Part 2.',
-    denominatorCandidateType: 'NONE_IDENTIFIED',
-    locatorRange: 'Domaine des Langues — P1 through P6',
-    hierarchyDepth: 'SURFACE',
-    reviewStatus: 'Denominator unknown. Internal structure requires extraction. Competency-based organization expected.',
-  },
-  {
-    subjectCode: 'FRENCH',
-    subjectNameAr: 'اللغة الفرنسية',
-    subjectNameFr: 'Français',
-    domainCode: 'LANGUAGES',
-    sourceOrganization: 'Grade sections within Languages domain. French section spans pages p216-p271 covering all 6 years (six années du cycle). Within-grade organization: not yet extracted. Expected to include comprehension, expression, and language activities.',
-    sourceStructuralTerminology: 'Français / Langue Française. Internal structure likely includes: compréhension, expression orale, expression écrite. Not confirmed by extraction.',
-    gradeDifferentiation: 'Present in all 6 grades (P1-P6). Explicit scope claim: "six années du cycle" confirms full primary coverage.',
-    denominatorCandidateType: 'NONE_IDENTIFIED',
-    locatorRange: 'Domaine des Langues — P1 through P6 (explicit p216-p271)',
-    hierarchyDepth: 'SURFACE',
-    reviewStatus: 'Denominator unknown. French section has most precise locator (EXACT_PAGE p216-p271). Internal structure requires extraction.',
-  },
-  {
-    subjectCode: 'MATH',
-    subjectNameAr: 'الرياضيات',
-    subjectNameFr: 'Mathématiques',
-    domainCode: 'MATH_SCIENCE_TECH',
-    sourceOrganization: 'Grade sections within Math/Science/Technology domain. Within-grade organization: not yet extracted. Mathematics typically organizes around domains/axes (e.g., Numbers, Geometry, Measurement) but this has not been confirmed by extraction.',
-    sourceStructuralTerminology: 'Mathématiques / الرياضيات. Potential internal axes: الأعداد (Numbers), الهندسة (Geometry), القياس (Measurement). Not confirmed by extraction.',
-    gradeDifferentiation: 'Present in all 6 grades (P1-P6). Each grade has a separate section.',
-    denominatorCandidateType: 'NONE_IDENTIFIED',
-    locatorRange: 'Domaine Mathématiques, Sciences et Technologie — P1 through P6',
-    hierarchyDepth: 'SURFACE',
-    reviewStatus: 'Denominator unknown. Math domain may have the richest internal structure but extraction pending.',
-  },
-  {
-    subjectCode: 'SCIENCE',
-    subjectNameAr: 'النشاط العلمي',
-    subjectNameFr: 'Activité Scientifique',
-    domainCode: 'MATH_SCIENCE_TECH',
-    sourceOrganization: 'Grade sections within Math/Science/Technology domain. Named "Scientific Activity" — activity-based pedagogy. Within-grade organization: not yet extracted. May organize around scientific activities/explorations rather than traditional topics.',
-    sourceStructuralTerminology: 'Activité Scientifique / النشاط العلمي. Activity-based naming suggests internal organization around scientific activities, not traditional units. Not confirmed.',
-    gradeDifferentiation: 'Present in all 6 grades (P1-P6). Activity-based approach may differ structurally from other subjects.',
-    denominatorCandidateType: 'NONE_IDENTIFIED',
-    locatorRange: 'Domaine Mathématiques, Sciences et Technologie — P1 through P6',
-    hierarchyDepth: 'SURFACE',
-    reviewStatus: 'Denominator unknown. Activity-based naming is a structural signal but not yet confirmed.',
-  },
-  {
-    subjectCode: 'ISLAMIC_EDUCATION',
-    subjectNameAr: 'التربية الإسلامية',
-    subjectNameFr: 'Enseignement Islamique',
-    domainCode: 'SOCIALIZATION',
-    sourceOrganization: 'Grade sections within Socialization domain. Within-grade organization: not yet extracted. Expected to organize around Islamic education components (Quran, Hadith, Aqeedah, etc.) but not confirmed.',
-    sourceStructuralTerminology: 'Enseignement Islamique / التربية الإسلامية. Potential components: القرآن الكريم, الحديث الشريف, العقيدة. Not confirmed by extraction.',
-    gradeDifferentiation: 'Present in all 6 grades (P1-P6). Each grade has a separate section.',
-    denominatorCandidateType: 'NONE_IDENTIFIED',
-    locatorRange: 'Domaine de la Socialisation — P1 through P6',
-    hierarchyDepth: 'SURFACE',
-    reviewStatus: 'Denominator unknown. Internal structure requires extraction.',
-  },
-  {
-    subjectCode: 'CIVIC_EDUCATION',
-    subjectNameAr: 'التربية المدنية',
-    subjectNameFr: 'Éducation Civique',
-    domainCode: 'SOCIALIZATION',
-    sourceOrganization: 'Grade sections within Socialization domain. Within-grade organization: not yet extracted. May be among the less richly structured subjects based on typical curriculum patterns.',
-    sourceStructuralTerminology: 'Éducation Civique / التربية المدنية. Internal organization unknown — may be less structured than language/math subjects.',
-    gradeDifferentiation: 'Present in all 6 grades (P1-P6). Each grade has a separate section.',
-    denominatorCandidateType: 'NONE_IDENTIFIED',
-    locatorRange: 'Domaine de la Socialisation — P1 through P6',
-    hierarchyDepth: 'SURFACE',
-    reviewStatus: 'Denominator unknown. Especially vulnerable to hallucination — sparse source structure.',
-  },
-  {
-    subjectCode: 'SPORT',
-    subjectNameAr: 'التربية البدنية',
-    subjectNameFr: 'Éducation Physique',
-    domainCode: 'SOCIALIZATION',
-    sourceOrganization: 'Grade sections within Socialization domain. Within-grade organization: not yet extracted. Physical education may organize around motor skills, games, and physical activities.',
-    sourceStructuralTerminology: 'Éducation Physique / التربية البدنية. Internal organization likely activity-based. Not confirmed.',
-    gradeDifferentiation: 'Present in all 6 grades (P1-P6). Each grade has a separate section.',
-    denominatorCandidateType: 'NONE_IDENTIFIED',
-    locatorRange: 'Domaine de la Socialisation — P1 through P6',
-    hierarchyDepth: 'SURFACE',
-    reviewStatus: 'Denominator unknown. Sparse structure — extract only what artifact supports.',
-  },
-  {
-    subjectCode: 'ART',
-    subjectNameAr: 'التربية التشكيلية',
-    subjectNameFr: 'Arts Plastiques',
-    domainCode: 'SOCIALIZATION',
-    sourceOrganization: 'Grade sections within Socialization domain. Within-grade organization: not yet extracted. Visual arts may organize around art activities, techniques, and expression.',
-    sourceStructuralTerminology: 'Arts Plastiques / التربية التشكيلية. Internal organization likely activity-based. Not confirmed.',
-    gradeDifferentiation: 'Present in all 6 grades (P1-P6). Each grade has a separate section.',
-    denominatorCandidateType: 'NONE_IDENTIFIED',
-    locatorRange: 'Domaine de la Socialisation — P1 through P6',
-    hierarchyDepth: 'SURFACE',
-    reviewStatus: 'Denominator unknown. Sparse structure — extract only what artifact supports.',
-  },
-  {
-    subjectCode: 'MUSIC',
-    subjectNameAr: 'التربية الموسيقية',
-    subjectNameFr: 'Musique',
-    domainCode: 'SOCIALIZATION',
-    sourceOrganization: 'Grade sections within Socialization domain. Within-grade organization: not yet extracted. Music education may organize around musical activities, listening, and expression.',
-    sourceStructuralTerminology: 'Musique / التربية الموسيقية. Internal organization likely activity-based. Not confirmed.',
-    gradeDifferentiation: 'Present in all 6 grades (P1-P6). Each grade has a separate section.',
-    denominatorCandidateType: 'NONE_IDENTIFIED',
-    locatorRange: 'Domaine de la Socialisation — P1 through P6',
-    hierarchyDepth: 'SURFACE',
-    reviewStatus: 'Denominator unknown. Sparse structure — extract only what artifact supports.',
-  },
-];
+function componentsForSubject(subjectCode: string): readonly DeepCurriculumElement[] {
+  const comps = getSubjectComponents(subjectCode);
+  const result: DeepCurriculumElement[] = [];
+  for (const comp of comps) {
+    for (const gradeCode of comp.confirmedGrades) {
+      result.push({
+        id: `${SRC}::${SRC_VERSION}::${gradeCode}::${subjectCode}::COMPONENT::${comp.componentCode}`,
+        sourceId: SRC,
+        sourceVersionId: SRC_VERSION,
+        educationSystemCode: 'MOROCCO',
+        stageCode: 'PRIMARY',
+        gradeCode,
+        subjectCode,
+        sourceStructuralType: 'COMPONENT',
+        sourceTerm: comp.nameFr,
+        sourceTermAr: comp.nameAr,
+        sourceTermFr: comp.nameFr,
+        sourceLocator: { precision: 'SECTION_ONLY', section: `${comp.nameFr} — ${gradeCode}`, heading: comp.nameAr },
+        extractionMethod: 'PUBLIC_SOURCE_CROSS_REFERENCE',
+        normalizationClassification: 'DERIVED',
+        evidenceClass: comp.evidenceClass,
+        verificationState: 'UNVERIFIED',
+        contentStatus: 'EXTRACTED_UNVERIFIED',
+        primaryArtifactConfirmation: comp.primaryArtifactConfirmation,
+        denominatorMembership: comp.componentCode,
+        evidenceLevel: comp.evidenceLevel,
+        evidenceSources: comp.evidenceSources,
+        publisherOrIssuer: comp.publisherOrIssuer,
+        retrievalHost: comp.retrievalHost,
+      });
+    }
+  }
+  return result;
+}
+
+function buildSubjectProfile(subjectCode: string, nameAr: string, nameFr: string, domainCode: string): SubjectStructuralProfile {
+  const comps = getSubjectComponents(subjectCode);
+  const compCount = COMPONENT_COUNTS[subjectCode] ?? 0;
+  const gradeScope = compCount > 0 ? comps[0]?.confirmedGrades : [];
+
+  const hasComponents = compCount > 0;
+  const sourceOrg = hasComponents
+    ? `${compCount} cross-reference-supported component candidates: ${comps.map((c) => c.nameFr).join(', ')}. Present in grades ${gradeScope?.join(', ')}. Supported by public cross-reference (NOT PDF extraction, NOT primary-artifact verified).`
+    : 'Grade sections within domain. Internal structure not confirmed by public sources. Component-level extraction pending.';
+
+  const terminology = hasComponents
+    ? `Component candidates (مكونات) from cross-reference: ${comps.map((c) => `${c.nameFr} (${c.nameAr})`).join('; ')}. Competency model: CROSS_REFERENCE_SUPPORTED (annual competency + sub-competencies per grade), NOT primary-artifact verified.`
+    : 'Internal organization unknown. No component structure confirmed by available public sources.';
+
+  const reviewStatus = hasComponents
+    ? `COMPONENT denominator PARTIAL (cross-reference candidate). Primary artifact deep extraction BLOCKED_BY_ARTIFACT_ACCESS. Direct PDF verification required for: (1) exact page locators, (2) verification of component counts, (3) competency enumeration.`
+    : 'Denominator unknown. Internal structure requires extraction. Competency-based organization expected but not confirmed.';
+
+  const depth = hasComponents ? 'PARTIAL' : 'SURFACE';
+
+  return {
+    subjectCode,
+    subjectNameAr: nameAr,
+    subjectNameFr: nameFr,
+    domainCode,
+    sourceOrganization: sourceOrg,
+    sourceStructuralTerminology: terminology,
+    gradeDifferentiation: hasComponents
+      ? `Present in all 6 grades (P1-P6). Component candidates supported for grades: ${gradeScope?.join(', ')}.`
+      : 'Present in all 6 grades (P1-P6). Each grade has a separate section.',
+    denominatorCandidateType: hasComponents ? 'COMPONENT' : 'NONE_IDENTIFIED',
+    locatorRange: `Domaine ${domainCode} — P1 through P6`,
+    hierarchyDepth: depth,
+    reviewStatus,
+  };
+}
+
+export const SUBJECT_STRUCTURAL_PROFILES: readonly SubjectStructuralProfile[] = OFFICIAL_SUBJECTS.map((s) =>
+  buildSubjectProfile(s.code, s.nameAr, s.nameFr, s.domain),
+);
 
 // ── PROFILE LOOKUP ───────────────────────────────────────────
 
@@ -174,6 +144,7 @@ export function getSubjectProfile(subjectCode: string): SubjectStructuralProfile
 
 // ============================================================
 // GRADE COMPLETENESS PROFILES (Gate 07C.5 §27)
+// Updated in Gate 07C.6 with deep extraction cell counts
 // ============================================================
 
 function cellCategory(gradeCode: string, subjectCode: string): CellCompletenessCategory {
@@ -200,16 +171,19 @@ export const GRADE_COMPLETENESS_PROFILES: readonly GradeCompletenessProfile[] =
       cellStatuses[subj] = cellCategory(gradeCode, subj);
     }
 
+    const partialCount = gradeCells.filter((c) => c.denominatorConfidence === 'PARTIAL').length;
+    const unknownCount = gradeCells.filter((c) => c.denominatorConfidence === 'UNKNOWN').length;
+
     return {
       gradeCode,
       subjects: subjectCodes,
       totalCells: gradeCells.length,
       denominatorReadyCells: gradeCells.filter((c) => c.denominatorConfidence !== 'UNKNOWN').length,
-      partialCells: gradeCells.filter((c) => c.denominatorConfidence === 'PARTIAL').length,
+      partialCells: partialCount,
       blockedCells: gradeCells.filter((c) => c.knownGapCount > 0).length,
       reviewQueueCount: gradeCells.filter((c) => c.reviewRequiredCount > 0).length,
       cellStatuses,
-      notes: `Grade ${gradeCode}: ${gradeCells.length} cells, all DENOMINATOR_UNKNOWN. Internal structure requires extraction.`,
+      notes: `Grade ${gradeCode}: ${gradeCells.length} cells. ${partialCount} PARTIAL (cross-reference-supported component candidates), ${unknownCount} UNKNOWN (no public-source confirmation).`,
     };
   });
 
@@ -217,12 +191,39 @@ export function getGradeProfile(gradeCode: string): GradeCompletenessProfile | u
   return GRADE_COMPLETENESS_PROFILES.find((p) => p.gradeCode === gradeCode);
 }
 
+// ── DEEP EXTRACTION CROSS-REFERENCES ─────────────────────────
+// Useful for test assertions.
+
+export const SUBJECT_COMPONENT_MAP: Record<string, { componentCode: string; nameAr: string; nameFr: string; grades: readonly string[] }[]> = {};
+const allSubjects = ['ARABIC', 'FRENCH', 'MATH', 'SCIENCE', 'ISLAMIC_EDUCATION', 'CIVIC_EDUCATION', 'SPORT', 'ART', 'MUSIC'];
+for (const subj of allSubjects) {
+  const comps = getSubjectComponents(subj);
+  if (comps.length > 0) {
+    SUBJECT_COMPONENT_MAP[subj] = comps.map((c) => ({
+      componentCode: c.componentCode,
+      nameAr: c.nameAr,
+      nameFr: c.nameFr,
+      grades: c.confirmedGrades,
+    }));
+  }
+}
+
+export const COMPETENCY_MODEL_STRUCTURE = {
+  modelElement: 'ANNUAL_COMPETENCY',
+  subElements: COMPETENCY_SUB_ELEMENTS.map((e) => ({ code: e.code, nameFr: e.nameFr })),
+  coveredGrades: PRIMARY_GRADE_CODES,
+  classification: 'CROSS_REFERENCE_SUPPORTED_COMPETENCY_STRUCTURE',
+  primaryArtifactConfirmation: 'NOT_VERIFIED',
+} as const;
+
 // ── PROFILE NOTES ────────────────────────────────────────────
 
 export const PROFILE_NOTES = {
-  subjectProfiles: '9 subject profiles. All have SURFACE hierarchy depth. All have NONE_IDENTIFIED denominator candidate. Profiles describe source-derived structure only — no fabrication.',
-  gradeProfiles: '6 grade profiles (P1-P6). Each has 9 cells. All cells are UNKNOWN. No grade claims completeness.',
-  antiFabrication: 'No internal organization invented for any subject. All profiles document what the artifact establishes AND what it does not.',
-  sourceBacking: 'All profiles trace to src-primary-curriculum-2021 v1.0.0. Source locator precision: SECTION_ONLY for all grade×subject cells.',
-  denominatorReadiness: '0 of 54 cells have a determined denominator. This is the honest state — internal structure extraction is required before denominators can be established.',
+  subjectProfiles: '9 subject profiles. 5 have PARTIAL hierarchy depth with COMPONENT denominator candidate (cross-reference-supported, NOT primary-artifact verified). 4 remain SURFACE with NONE_IDENTIFIED denominator. All deep extraction is PUBLIC_SOURCE_CROSS_REFERENCE, NOT direct artifact extraction.',
+  gradeProfiles: '6 grade profiles (P1-P6). Each has 9 cells. 27 cells PARTIAL, 27 cells UNKNOWN. No grade claims completeness.',
+  antiFabrication: 'No internal organization invented. Profiles document what public sources support AND what they do not. Missing component structures for Islamic Education, Sport, Art, Music are explicitly documented as UNKNOWN.',
+  sourceBacking: 'All profiles trace to src-primary-curriculum-2021 v1.0.0. Deep extraction uses PUBLIC_SOURCE_CROSS_REFERENCE, not direct PDF extraction. All primary-artifact deep extraction BLOCKED_BY_ARTIFACT_ACCESS.',
+  denominatorReadiness: '27 of 54 cells have PARTIAL (cross-reference) denominator candidate. 27 cells remain UNKNOWN. No cell has VERIFIED denominator. Ratio undefined for all cells.',
+  competencyModel: 'CROSS_REFERENCE_SUPPORTED_COMPETENCY_STRUCTURE — per-grade annual competency + entry/exit profiles + sub-competencies supported by Scribd snippets, PIRLS 2021, academic papers. NOT primary-artifact verified.',
+  deepExtraction: `Gate 07C.6: ${COMPONENT_COUNTS.ARABIC ?? 0} Arabic component candidates, ${COMPONENT_COUNTS.FRENCH ?? 0} French, ${COMPONENT_COUNTS.MATH ?? 0} Math, ${COMPONENT_COUNTS.SCIENCE ?? 0} Science, ${COMPONENT_COUNTS.CIVIC_EDUCATION ?? 0} Civic candidates. All are cross-reference candidates, NOT verified official denominators.`,
 } as const;

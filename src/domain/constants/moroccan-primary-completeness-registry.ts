@@ -1,10 +1,19 @@
 /**
- * Qarayti.ai - Gate 07C.5: Moroccan Primary Curriculum Completeness Registry
+ * Qarayti.ai - Gate 07C.5/07C.6: Moroccan Primary Curriculum Completeness Registry
  *
- * SOURCE-DERIVED DENOMINATORS + GAP RESOLUTION
+ * SOURCE-DERIVED DENOMINATORS + GAP RESOLUTION + DEEP EXTRACTION UPDATE
+ *
+ * GATE 07C.6 UPDATE:
+ *   Deep extraction from public sources confirmed subject components for:
+ *     ARABIC: 3 components (listening/speaking, reading, writing)
+ *     FRENCH: 2 components (reading, written production)
+ *     MATH: 3 components (numbers/arithmetic, geometry/measurement, data)
+ *     SCIENCE: 4 components (life/earth, physical, space, technology)
+ *     CIVIC_EDUCATION: 3 components (history, geography, citizenship) — P4-P6 only
+ *   Islamic Education, Sport, Art, Music: no components confirmed by public sources.
  *
  * RULES:
- *   - Denominator comes from artifact inspection, never invented
+ *   - Denominator comes from evidence, never invented
  *   - Unknown denominator → ratio = undefined (never 0%)
  *   - 100% requires VERIFIED denominator + exact match + no blocking gaps
  *   - Different subjects may use different denominator types
@@ -21,6 +30,7 @@ import type {
   CompletenessStatus,
   CellScanStatus,
   CurriculumSourceLocator,
+  EvidenceClass,
 } from '../types/curriculum-source-governance.types';
 
 import { PRIMARY_GRADE_CODES } from './curriculum-architecture.constants';
@@ -48,7 +58,6 @@ const OFFICIAL_SUBJECTS = [
 ] as const;
 
 // ── DENOMINATOR ID ───────────────────────────────────────────
-// Deterministic: sourceId::sourceVersionId::grade::subject::denominatorType
 
 function denominatorId(
   sourceId: string,
@@ -60,44 +69,116 @@ function denominatorId(
   return [sourceId, sourceVersionId, gradeCode, subjectCode, denominatorType].join('::');
 }
 
-// ── SOURCE ANALYSIS ──────────────────────────────────────────
-// What the artifact actually establishes at each structural level.
+// ── SUBJECT DENOMINATOR CONFIG ───────────────────────────────
+// What denominator each subject uses based on Gate 07C.6 deep extraction.
 
-/**
- * ARTIFACT STRUCTURE ANALYSIS (556-page document):
- *
- * Level 1: Document Parts (2)
- *   Part 1: General Framework — pedagogical principles, not enumerable curriculum items
- *   Part 2: Program Organization by Domain — the curriculum content
- *
- * Level 2: Domains (3)
- *   Languages, Math/Science/Tech, Socialization
- *   → Each domain groups subjects. Not an enumerable denominator for individual subjects.
- *
- * Level 3: Subjects (9)
- *   Each subject has a section within its domain for each grade.
- *   → Subject presence per grade is enumerable (9 subjects × 6 grades = 54 cells).
- *     This is already captured as the GRADE_SECTION level.
- *
- * Level 4: Within-grade×subject sections
- *   → NOT YET EXTRACTED. The artifact contains detailed organization within each
- *     grade×subject section (competencies, components, activities, etc.), but
- *     these have not been systematically parsed.
- *
- * CRITICAL FINDING:
- *   The denominator for structural completeness CANNOT be established at the
- *   grade×subject cell level until the internal structure of each section is
- *   mapped. The only enumerable denominator we have today is the set of
- *   grade×subject cells itself (54), which is already known and doesn't
- *   represent internal completeness.
- *
- * IMPLICATION:
- *   All 54 cells have DENOMINATOR_UNKNOWN for internal completeness.
- *   This is the honest state. No fabrication.
- */
+interface SubjectDenominatorConfig {
+  readonly subjectCode: string;
+  readonly denominatorType: DenominatorType;
+  readonly componentCount: number | undefined;
+  readonly confidence: DenominatorConfidence;
+  readonly evidenceMethod: string;
+  readonly evidenceClass: EvidenceClass;
+  readonly primaryArtifactConfirmation: 'NOT_VERIFIED' | 'VERIFIED';
+  readonly notes: string;
+  readonly civicGradesOnly?: boolean;
+}
 
-// ── DENOMINATOR REGISTRY ─────────────────────────────────────
-// One denominator record per grade×subject cell.
+const SUBJECT_DENOMINATOR_CONFIGS: readonly SubjectDenominatorConfig[] = [
+  {
+    subjectCode: 'ARABIC',
+    denominatorType: 'COMPONENT',
+    componentCount: 3,
+    confidence: 'PARTIAL',
+    evidenceMethod: 'PUBLIC_SOURCE_CROSS_REFERENCE',
+    evidenceClass: 'SECONDARY_CROSS_REFERENCE',
+    primaryArtifactConfirmation: 'NOT_VERIFIED',
+    notes: '3 component candidate count from public cross-reference (Hespress, Cariatmaaref, teacher guides). PARTIAL — NOT a verified official denominator. Primary artifact NOT inspected.',
+  },
+  {
+    subjectCode: 'FRENCH',
+    denominatorType: 'COMPONENT',
+    componentCount: 2,
+    confidence: 'PARTIAL',
+    evidenceMethod: 'PUBLIC_SOURCE_CROSS_REFERENCE',
+    evidenceClass: 'SECONDARY_CROSS_REFERENCE',
+    primaryArtifactConfirmation: 'NOT_VERIFIED',
+    notes: '2 component candidate count from public cross-reference (Cariatmaaref, Modarissi). PARTIAL — NOT a verified official denominator. French section p216-p271 from external file title, not direct access.',
+  },
+  {
+    subjectCode: 'MATH',
+    denominatorType: 'COMPONENT',
+    componentCount: 3,
+    confidence: 'PARTIAL',
+    evidenceMethod: 'PUBLIC_SOURCE_CROSS_REFERENCE',
+    evidenceClass: 'OFFICIAL_CROSS_REFERENCE',
+    primaryArtifactConfirmation: 'NOT_VERIFIED',
+    notes: '3 component candidate count. Kech24 reports a ministry announcement (official cross-reference); Scribd/Moualimi (secondary). PARTIAL — NOT a verified official denominator.',
+  },
+  {
+    subjectCode: 'SCIENCE',
+    denominatorType: 'COMPONENT',
+    componentCount: 4,
+    confidence: 'PARTIAL',
+    evidenceMethod: 'PUBLIC_SOURCE_CROSS_REFERENCE',
+    evidenceClass: 'OFFICIAL_CROSS_REFERENCE',
+    primaryArtifactConfirmation: 'NOT_VERIFIED',
+    notes: '4 component candidate count. Kech24 ministry announcement (official cross-reference); Scribd, LeadingEducation (secondary). Space/Technology are STRONGLY_SUPPORTED only. PARTIAL — NOT a verified official denominator.',
+  },
+  {
+    subjectCode: 'CIVIC_EDUCATION',
+    denominatorType: 'COMPONENT',
+    componentCount: 3,
+    confidence: 'PARTIAL',
+    evidenceMethod: 'PUBLIC_SOURCE_CROSS_REFERENCE',
+    evidenceClass: 'OFFICIAL_CROSS_REFERENCE',
+    primaryArtifactConfirmation: 'NOT_VERIFIED',
+    notes: '3 component candidate count (history, geography, citizenship). ONLY for P4-P6 (social studies begins at Grade 4). Kech24, Atarbawi, Moualimi. PARTIAL — NOT a verified official denominator.',
+    civicGradesOnly: true,
+  },
+  {
+    subjectCode: 'ISLAMIC_EDUCATION',
+    denominatorType: 'NONE_IDENTIFIED',
+    componentCount: undefined,
+    confidence: 'UNKNOWN',
+    evidenceMethod: 'ARTIFACT_SECTION_INSPECTION',
+    evidenceClass: 'PRIMARY_ARTIFACT',
+    primaryArtifactConfirmation: 'NOT_VERIFIED',
+    notes: 'No internal components confirmed by public sources. Structure remains UNKNOWN.',
+  },
+  {
+    subjectCode: 'SPORT',
+    denominatorType: 'NONE_IDENTIFIED',
+    componentCount: undefined,
+    confidence: 'UNKNOWN',
+    evidenceMethod: 'ARTIFACT_SECTION_INSPECTION',
+    evidenceClass: 'PRIMARY_ARTIFACT',
+    primaryArtifactConfirmation: 'NOT_VERIFIED',
+    notes: 'No internal components confirmed by public sources.',
+  },
+  {
+    subjectCode: 'ART',
+    denominatorType: 'NONE_IDENTIFIED',
+    componentCount: undefined,
+    confidence: 'UNKNOWN',
+    evidenceMethod: 'ARTIFACT_SECTION_INSPECTION',
+    evidenceClass: 'PRIMARY_ARTIFACT',
+    primaryArtifactConfirmation: 'NOT_VERIFIED',
+    notes: 'No internal components confirmed by public sources.',
+  },
+  {
+    subjectCode: 'MUSIC',
+    denominatorType: 'NONE_IDENTIFIED',
+    componentCount: undefined,
+    confidence: 'UNKNOWN',
+    evidenceMethod: 'ARTIFACT_SECTION_INSPECTION',
+    evidenceClass: 'PRIMARY_ARTIFACT',
+    primaryArtifactConfirmation: 'NOT_VERIFIED',
+    notes: 'No internal components confirmed by public sources.',
+  },
+];
+
+// ── LOCATOR FACTORY ──────────────────────────────────────────
 
 function subjectGradeLocator(domainCode: string, gradeCode: string): CurriculumSourceLocator {
   const domainNames: Record<string, { ar: string; fr: string }> = {
@@ -113,28 +194,45 @@ function subjectGradeLocator(domainCode: string, gradeCode: string): CurriculumS
   };
 }
 
+// ── DENOMINATOR REGISTRY ─────────────────────────────────────
+// One denominator record per grade×subject cell.
+
 const denominatorRegistry: CurriculumExtractionDenominator[] = [];
 
 for (const gradeCode of PRIMARY_GRADE_CODES) {
   for (const subject of OFFICIAL_SUBJECTS) {
+    const config = SUBJECT_DENOMINATOR_CONFIGS.find((c) => c.subjectCode === subject.code)!;
     const locator = subjectGradeLocator(subject.domain, gradeCode);
 
+    // CIVIC_EDUCATION only has components from P4-P6
+    const isCivicP1P3 = config.civicGradesOnly && ['P1', 'P2', 'P3'].includes(gradeCode);
+
     denominatorRegistry.push({
-      id: denominatorId(SRC, SRC_VERSION, gradeCode, subject.code, 'NONE_IDENTIFIED'),
+      id: denominatorId(
+        SRC,
+        SRC_VERSION,
+        gradeCode,
+        subject.code,
+        isCivicP1P3 ? 'NONE_IDENTIFIED' : config.denominatorType,
+      ),
       educationSystemCode: SYS,
       stageCode: STAGE,
       gradeCode,
       subjectCode: subject.code,
-      denominatorType: 'NONE_IDENTIFIED',
-      expectedCount: undefined,
+      denominatorType: isCivicP1P3 ? 'NONE_IDENTIFIED' : config.denominatorType,
+      expectedCount: isCivicP1P3 ? undefined : config.componentCount,
       sourceId: SRC,
       sourceVersionId: SRC_VERSION,
       sourceLocator: locator,
-      evidenceMethod: 'ARTIFACT_SECTION_INSPECTION',
-      confidence: 'UNKNOWN',
-      completenessLevel: 'DENOMINATOR_UNKNOWN',
+      evidenceMethod: config.evidenceMethod,
+      evidenceClass: isCivicP1P3 ? 'PRIMARY_ARTIFACT' : config.evidenceClass,
+      primaryArtifactConfirmation: config.primaryArtifactConfirmation,
+      confidence: isCivicP1P3 ? 'UNKNOWN' : config.confidence,
+      completenessLevel: isCivicP1P3 ? 'DENOMINATOR_UNKNOWN' : 'DENOMINATOR_PARTIAL',
       verificationState: 'UNVERIFIED',
-      notes: `Grade section located in artifact. Internal structure (units, components, activities) not yet extracted. Denominator cannot be established until internal structure is mapped.`,
+      notes: isCivicP1P3
+        ? 'Civic Education / Social Studies begins at Grade 4. P1-P3: no social studies components. Denominator unknown.'
+        : config.notes,
     });
   }
 }
@@ -142,7 +240,6 @@ for (const gradeCode of PRIMARY_GRADE_CODES) {
 export const DENOMINATOR_REGISTRY: readonly CurriculumExtractionDenominator[] = denominatorRegistry;
 
 // ── COMPLETENESS CELLS ───────────────────────────────────────
-// One cell per grade×subject, with full completeness accounting.
 
 function completenessStatus(confidence: DenominatorConfidence, expected: number | undefined, extracted: number, blockingGaps: number, reviewRequired: number): CompletenessStatus {
   if (confidence === 'UNKNOWN') return 'DENOMINATOR_UNKNOWN';
@@ -185,17 +282,19 @@ for (const gradeCode of PRIMARY_GRADE_CODES) {
       expectedCount: denom?.expectedCount,
       extractedCount,
       reviewRequiredCount: 0,
-      knownGapCount: 1,
+      knownGapCount: denom?.confidence === 'UNKNOWN' ? 1 : 0,
       completenessRatio: undefined,
       completenessStatus: completenessStatus(
         denom?.confidence ?? 'UNKNOWN',
         denom?.expectedCount,
         extractedCount,
-        1,
+        denom?.confidence === 'UNKNOWN' ? 1 : 0,
         0,
       ),
       denominatorId: denom?.id,
-      notes: `Grade section extracted. Internal structure unknown. Denominator not established.`,
+      notes: denom?.confidence === 'PARTIAL'
+        ? `Component denominator established from public sources (${denom.expectedCount} components). Ratio undefined — deep extraction not yet performed.`
+        : `Grade section extracted. Internal structure unknown. Denominator not established.`,
     });
   }
 }
@@ -231,7 +330,7 @@ export const COMPLETENESS_METRICS = {
   denominatorUnknownCount: completenessCells.filter((c) => c.denominatorConfidence === 'UNKNOWN').length,
 } as const;
 
-// ── GAP REGISTRY (resolved/deferred from Gate 07C.4) ────────
+// ── GAP REGISTRY ─────────────────────────────────────────────
 
 export interface ResolvedGap {
   readonly gapId: string;
@@ -245,49 +344,51 @@ export interface ResolvedGap {
 export const RESOLVED_GAPS: readonly ResolvedGap[] = [
   {
     gapId: 'GAP-001',
-    beforeStatus: 'OPEN / BLOCKING / denominator unknown',
-    evidenceInvestigated: 'Full artifact structure analyzed: 2 parts, 3 domains, 9 subjects, 54 grade sections. No explicit enumeration of internal units/components/activities found at the grade×subject level within the currently mapped structure. The artifact does not contain a table of contents or program table that establishes expected counts for sub-section entities.',
-    afterStatus: 'PARTIALLY_RESOLVED — denominator type NONE_IDENTIFIED, confidence UNKNOWN',
-    resolutionReason: 'Denominator cannot be established from current extraction depth. The artifact structure has been exhaustively mapped at the document-part/domain/subject/grade-section level. Internal sub-section structure requires future deep extraction. This is the honest state.',
-    remainingBlocker: 'Internal grade×subject section structure must be extracted before denominator can be determined. Subject-specific structural patterns (competencies, components, activities) are present in the artifact but not yet parsed.',
+    beforeStatus: 'OPEN / BLOCKING / 54 UNKNOWN denominators',
+    evidenceInvestigated: 'Gate 07C.6 public cross-reference produced candidate component evidence: ARABIC (3), FRENCH (2), MATH (3), SCIENCE (4), CIVIC_EDUCATION (3 from P4). 27 cells transitioned from UNKNOWN to PARTIAL. 27 cells remain UNKNOWN (CIVIC P1-P3 = 3, ISLAMIC_EDUCATION = 6, SPORT = 6, ART = 6, MUSIC = 6).',
+    afterStatus: 'PARTIALLY_RESOLVED at most — 27 cells have cross-reference-supported PARTIAL denominator evidence, 27 remain UNKNOWN',
+    resolutionReason: 'Cross-reference-supported PARTIAL denominator evidence established for 5 subjects. Primary artifact confirmation for all component counts = NOT_VERIFIED. Primary artifact confirmation of denominators remains OPEN.',
+    remainingBlocker: 'PDF access required for: (1) verification of component counts against primary artifact, (2) exact page locators, (3) component structure for Islamic Education, Sport, Art, Music, (4) competency enumeration per grade. Primary artifact confirmation still open.',
   },
   {
     gapId: 'GAP-002',
     beforeStatus: 'OPEN / units organization unresolved',
-    evidenceInvestigated: 'Investigated whether "unit" (وحدة) is a source-defined structural concept. The 2021 Moroccan primary curriculum uses competency-based organization. Subjects may use different structural terminology: components (Arabic), domains/axes (Math), activities (Science), composantes (French). "Unit" is a possible derived mapping but not the primary source structure.',
-    afterStatus: 'DEFERRED_WITH_REASON — source uses different structural concepts',
-    resolutionReason: 'GAP-002 is not resolved by finding units. It is resolved by documenting that the source uses subject-specific structural concepts, not a uniform "unit" model. Each subject profile records its own structural terminology.',
-    remainingBlocker: 'Detailed subject-specific structural extraction needed to confirm exact internal organization per subject.',
+    evidenceInvestigated: 'Gate 07C.6: public sources suggest source uses COMPONENTS (مكونات) rather than UNITS. Arabic: listening/speaking, reading, writing. French: reading, written production. Math: numbers/arithmetic, geometry/measurement, data. Science: life/earth, physical, space, technology. This is CROSS-REFERENCE_SUPPORTED, not direct-artifact verified.',
+    afterStatus: 'CLARIFIED_BY_CROSS_REFERENCE — source likely uses COMPONENTS not UNITS; NOT fully artifact-resolved',
+    resolutionReason: 'Subject-specific public evidence suggests source uses COMPONENTS (not UNITS). However, primary artifact was NOT inspected. Do NOT mark fully artifact-resolved.',
+    remainingBlocker: 'Primary artifact inspection required to confirm COMPONENTS terminology and structure.',
   },
   {
     gapId: 'GAP-003',
     beforeStatus: 'OPEN / competencies unresolved',
-    evidenceInvestigated: 'Competencies are referenced in Part 1 (General Framework) of the artifact as the pedagogical basis. However, competency enumeration at the grade×subject level has not been extracted. Competencies exist in the source but are not yet mapped as structural elements.',
-    afterStatus: 'DEFERRED_WITH_REASON — competency structure exists in source but not yet extracted',
-    resolutionReason: 'Competency structure is architecturally supported (DenominatorType includes COMPETENCY_GROUP). Extraction from Part 1 + grade-level sections is future gate work. No fabrication applied.',
-    remainingBlocker: 'Competency extraction from artifact Part 1 and grade-level sections required.',
+    evidenceInvestigated: 'Gate 07C.6: CROSS_REFERENCE_SUPPORTED_COMPETENCY_STRUCTURE. Per-grade model: annual competency (الكفاية السنوية), entry profile, exit profile, sub-competencies. Supported by Scribd snippets, PIRLS 2021, academic papers — NOT direct-artifact verified.',
+    afterStatus: 'PARTIALLY_RESOLVED — competency structure CROSS_REFERENCE_SUPPORTED, not direct-artifact verified',
+    resolutionReason: 'Competency organizational model is CROSS_REFERENCE_SUPPORTED (annual competency + sub-competencies per grade), NOT direct-artifact verified. Specific competency text not created. Enumeration is future gate work.',
+    remainingBlocker: 'Primary artifact parsing required for direct competency structure verification. Competency enumeration per grade×subject not yet performed.',
   },
   {
     gapId: 'GAP-004',
-    beforeStatus: 'DEFERRED / lessons not applicable at this stage',
-    evidenceInvestigated: 'The official curriculum document is a program-level document, not a lesson plan. "Lesson" is not an enumerable layer in the official curriculum structure — it belongs to teacher planning and textbook organization. Official curriculum != textbook lesson plan.',
-    afterStatus: 'RESOLVED — lesson denominator NOT_APPLICABLE',
-    resolutionReason: 'Lesson enumeration is not part of official curriculum structure (NOT_APPLICABLE). The artifact organizes by domains, subjects, and competencies — not by individual lessons. Lesson structure belongs to textbook/teacher planning layer, which is a different source.',
-    remainingBlocker: 'None — fully resolved. Lesson concept is NOT_APPLICABLE to official curriculum structure.',
+    beforeStatus: 'DEFERRED / lessons not applicable',
+    evidenceInvestigated: 'Lesson denominator NOT_APPLICABLE — established in Gate 07C.5 independently of this gate: curriculum is competency-based, not lesson-based.',
+    afterStatus: 'RESOLVED — lesson denominator NOT_APPLICABLE (from prior Gate 07C.5 evidence)',
+    resolutionReason: 'Lesson denominator NOT_APPLICABLE established independently by Gate 07C.5. Not dependent on Gate 07C.6 evidence.',
+    remainingBlocker: undefined,
   },
 ];
 
 // ── COMPLETENESS NOTES ───────────────────────────────────────
 
 export const COMPLETENESS_NOTES = {
-  summary: '54 grade×subject cells. All have DENOMINATOR_UNKNOWN. No cell has a measurable completeness ratio. The artifact has been mapped at document-part/domain/subject/grade-section level. Internal sub-section structure not yet extracted.',
-  antiFabrication: 'No denominators invented. No expected counts fabricated. No completeness percentages claimed. All 54 cells have ratio = undefined.',
-  denominatorRule: 'A percentage requires a denominator. Unknown denominator → ratio = undefined, never 0% or 100%.',
+  summary: 'Gate 07C.6: 27 cells now have PARTIAL cross-reference-supported denominator candidates. 27 cells remain UNKNOWN. ARABIC(3), FRENCH(2), MATH(3), SCIENCE(4) candidate counts for 6 grades = 24 cells. CIVIC_EDUCATION(3) candidate count for P4-P6 = 3 cells. Total 27 PARTIAL (cross-reference candidates, NOT verified official denominators). Islamic Education, Sport, Art, Music (27 cells): no components confirmed. All ratios remain undefined. All primary-artifact deep extraction BLOCKED_BY_ARTIFACT_ACCESS.',
+  antiFabrication: 'No denominators invented. Component counts are public cross-reference candidates (Hespress, Kech24, Cariatmaaref, Scribd, teacher guides) — NOT verified official denominators. No PDF content was directly extracted. Component counts may be incomplete — public sources may not list all components.',
+  denominatorRule: 'A percentage requires a denominator. CROSS-REFERENCE PARTIAL denominator → ratio still undefined (not VERIFIED). Only VERIFIED denominator permits 100%.',
   hundredPercentRule: '100% requires: VERIFIED denominator + expectedCount > 0 + extractedCount == expectedCount + no blocking gaps + no review-required items.',
-  gapResolution: 'GAP-001: PARTIALLY_RESOLVED (exhaustively investigated, UNKNOWN is honest). GAP-002: DEFERRED_WITH_REASON (source uses different structure). GAP-003: DEFERRED_WITH_REASON (competency extraction future gate). GAP-004: RESOLVED (NOT_APPLICABLE — lessons not in official curriculum).',
+  gapResolution: 'GAP-001: PARTIALLY_RESOLVED at most (27/54 cross-reference PARTIAL, primary artifact confirmation open). GAP-002: CLARIFIED_BY_CROSS_REFERENCE (not artifact-resolved). GAP-003: PARTIALLY_RESOLVED (competency CROSS_REFERENCE_SUPPORTED, not artifact-verified). GAP-004: RESOLVED (from prior Gate 07C.5 evidence, NOT_APPLICABLE).',
+  authoritySeparation: 'ORIGINAL CURRICULUM ARTIFACT != PUBLIC CROSS-REFERENCE != RETRIEVAL HOST. Cross-reference evidence does NOT inherit OFFICIAL_CURRICULUM_DOCUMENT authority. Retrieval host cannot grant artifact authority.',
   sourceCurrentness: 'NO_NEWER_VERIFIED_SOURCE_FOUND. July 2021 Version Finale remains primary source.',
-  versionSafety: 'All denominator IDs include sourceId and sourceVersionId. Historical denominators coexist. A future source amendment creates new denominator records.',
+  versionSafety: 'All denominator IDs include sourceId and sourceVersionId. Historical denominators coexist.',
   allScopeSafety: 'ALL_PRIMARY and ALL are aggregate source-scope values, not learner GradeCode/SubjectCode.',
   published: 'PUBLISHED = 0. No curriculum content published.',
-  locatorQuality: 'SECTION_ONLY = 54 (grade×subject cells), DOCUMENT_LEVEL = 3 (2 doc parts + domain scope), EXACT_PAGE = 1 (French section p216-p271), UNKNOWN = 0.',
+  locatorQuality: 'SECTION_ONLY = 54 (grade×subject cells), DOCUMENT_LEVEL = 3., EXACT_PAGE = 1 (French p216-p271, from external/cross-reference, NOT primary-artifact-verified), UNKNOWN = 0.',
+  deepExtraction: 'Gate 07C.6 performed PUBLIC_SOURCE_CROSS_REFERENCE extraction (CROSS_REFERENCE_SUPPORTED). 15 subject component candidates across 5 subjects. Competency structure CROSS_REFERENCE_SUPPORTED. PRIMARY_ARTIFACT_DEEP_EXTRACTION = BLOCKED_BY_ARTIFACT_ACCESS. No direct PDF extraction performed.',
 } as const;
