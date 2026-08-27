@@ -174,11 +174,11 @@ for (const grade of PRIMARY_GRADE_CODES) {
   assert(islamicMapping!.confirmedGrades.includes(grade), 'C16 - Islamic Education confirmed for ' + grade);
 }
 
-// C17: French is NOT confirmed for P1 or P2 at national level
+// C17: French IS confirmed for P1-P6 (Gate 07C.2: authenticated document includes French for all 6 years)
 const frenchMapping = PRIMARY_SUBJECT_SOURCE_MAPPINGS.find((m) => m.subjectCode === 'FRENCH');
 assert(!!frenchMapping, 'C17 - French mapping exists');
-assert(!frenchMapping!.confirmedGrades.includes('P1'), 'C17 - French not confirmed for P1');
-assert(!frenchMapping!.confirmedGrades.includes('P2'), 'C17 - French not confirmed for P2');
+assert(frenchMapping!.confirmedGrades.includes('P1'), 'C17 - French confirmed for P1 (Gate 07C.2)');
+assert(frenchMapping!.confirmedGrades.includes('P2'), 'C17 - French confirmed for P2 (Gate 07C.2)');
 
 // C18: French is confirmed for P3, P4, P5, P6
 assert(frenchMapping!.confirmedGrades.includes('P3'), 'C18 - French confirmed for P3');
@@ -192,9 +192,9 @@ assert(!!scienceMapping, 'C19 - Science mapping exists');
 assert(scienceMapping!.officialNameAr === 'النشاط العلمي', 'C19 - Science name is النشاط العلمي');
 assert(scienceMapping!.officialNameAr !== 'التربية العلمية', 'C19 - Science name is NOT التربية العلمية');
 
-// C20: all subject mappings have verifiedAtGradeLevel = false (source unverified)
+// C20: all subject mappings have verifiedAtGradeLevel = true (Gate 07C.2: source authenticated)
 for (const mapping of PRIMARY_SUBJECT_SOURCE_MAPPINGS) {
-  assert(mapping.verifiedAtGradeLevel === false, 'C20 - ' + mapping.subjectCode + ' verifiedAtGradeLevel is false');
+  assert(mapping.verifiedAtGradeLevel === true, 'C20 - ' + mapping.subjectCode + ' verifiedAtGradeLevel is true (Gate 07C.2)');
 }
 
 // ============================================================
@@ -232,7 +232,7 @@ for (const cell of VERIFIED_PRIMARY_COVERAGE_MATRIX) {
   assert(cell.sourceIds.length >= 1, 'C26 - cell ' + cell.gradeCode + '/' + cell.subjectCode + ' has at least one source');
 }
 
-// C27: French P1 and P2 cells have REVIEW_REQUIRED verification state
+// C27: French P1 and P2 cells are now UNVERIFIED (Gate 07C.2: conflict resolved by primary source)
 const frenchP1 = VERIFIED_PRIMARY_COVERAGE_MATRIX.find(
   (c) => c.gradeCode === 'P1' && c.subjectCode === 'FRENCH',
 );
@@ -241,27 +241,30 @@ const frenchP2 = VERIFIED_PRIMARY_COVERAGE_MATRIX.find(
 );
 assert(!!frenchP1, 'C27 - French P1 cell exists');
 assert(!!frenchP2, 'C27 - French P2 cell exists');
-assert(frenchP1!.verificationState === 'REVIEW_REQUIRED', 'C27 - French P1 is REVIEW_REQUIRED');
-assert(frenchP2!.verificationState === 'REVIEW_REQUIRED', 'C27 - French P2 is REVIEW_REQUIRED');
+assert(frenchP1!.verificationState === 'UNVERIFIED', 'C27 - French P1 is UNVERIFIED (Gate 07C.2)');
+assert(frenchP2!.verificationState === 'UNVERIFIED', 'C27 - French P2 is UNVERIFIED (Gate 07C.2)');
 
-// C28: French introduction conflict is documented with corrected classifications
+// C28: French introduction conflict is documented with resolved classifications (Gate 07C.2)
 assert(FRENCH_INTRODUCTION_CONFLICT.claim.includes('French'), 'C28 - conflict claim mentions French');
-assert(FRENCH_INTRODUCTION_CONFLICT.sourceA.classification === 'AUTHORIZED_REFERENCE', 'C28 - sourceA is AUTHORIZED_REFERENCE');
+assert(FRENCH_INTRODUCTION_CONFLICT.sourceA.classification === 'OFFICIAL_CURRICULUM_DOCUMENT', 'C28 - sourceA is OFFICIAL_CURRICULUM_DOCUMENT (Gate 07C.2)');
 assert(FRENCH_INTRODUCTION_CONFLICT.sourceB.classification === 'SECONDARY_REFERENCE', 'C28 - sourceB is SECONDARY_REFERENCE');
-assert(FRENCH_INTRODUCTION_CONFLICT.resolutionStatus === 'REVIEW_REQUIRED', 'C28 - resolution is REVIEW_REQUIRED');
+assert(FRENCH_INTRODUCTION_CONFLICT.resolutionStatus === 'RESOLVED_BY_PRIMARY_SOURCE', 'C28 - resolution is RESOLVED_BY_PRIMARY_SOURCE (Gate 07C.2)');
 assert(FRENCH_INTRODUCTION_CONFLICT.affectedGrades.includes('P1'), 'C28 - affected grades include P1');
 assert(FRENCH_INTRODUCTION_CONFLICT.affectedGrades.includes('P2'), 'C28 - affected grades include P2');
 assert(FRENCH_INTRODUCTION_CONFLICT.affectedGrades.includes('P3'), 'C28 - affected grades include P3');
 
-// C29: coverage summary totals add up to 54
+// C29: coverage summary totals add up to 54 (Gate 07C.2: all 54 cells SOURCE_VERIFIED)
 const totalFromStatuses =
   COVERAGE_SUMMARY.byStatus.SOURCE_REQUIRED +
+  COVERAGE_SUMMARY.byStatus.SOURCE_VERIFIED +
   COVERAGE_SUMMARY.byStatus.NOT_INGESTED +
   COVERAGE_SUMMARY.byStatus.PARTIALLY_COVERED +
   COVERAGE_SUMMARY.byStatus.FULLY_COVERED +
   COVERAGE_SUMMARY.byStatus.VERIFIED +
   COVERAGE_SUMMARY.byStatus.PUBLISHED;
 assert(totalFromStatuses === 54, 'C29 - status totals sum to 54 (got ' + totalFromStatuses + ')');
+assert(COVERAGE_SUMMARY.byStatus.SOURCE_VERIFIED === 54, 'C29 - all 54 cells are SOURCE_VERIFIED (Gate 07C.2)');
+assert(COVERAGE_SUMMARY.byStatus.SOURCE_REQUIRED === 0, 'C29 - zero SOURCE_REQUIRED cells (Gate 07C.2)');
 
 // C30: all grade codes in the matrix are valid primary grade codes
 const validGradeCodes = new Set(PRIMARY_GRADE_CODES);
@@ -313,10 +316,10 @@ const competencyRule = NORMALIZATION_BLUEPRINT.find((r) => r.sourceField.include
 assert(!!competencyRule, 'C36 - competency rule exists');
 assert(competencyRule!.mappingType !== 'DIRECT', 'C36 - competency mapping is not DIRECT');
 
-// C37: risk register includes primary source issuer unverified risk at CRITICAL severity
-const criticalRisk = NORMALIZATION_RISKS.find((r) => r.risk.includes('issuer unverified'));
-assert(!!criticalRisk, 'C37 - issuer unverified risk exists');
-assert(criticalRisk!.severity === 'CRITICAL', 'C37 - issuer unverified risk is CRITICAL');
+// C37: risk register includes issuer risk at RESOLVED severity (Gate 07C.2)
+const resolvedRisk = NORMALIZATION_RISKS.find((r) => r.risk.includes('issuer') || r.risk.includes('resolved') || r.risk.includes('RESOLVED'));
+assert(!!resolvedRisk, 'C37 - issuer/resolved risk exists');
+assert(resolvedRisk!.severity === 'RESOLVED', 'C37 - issuer risk is RESOLVED (Gate 07C.2)');
 
 // C38: risk register includes retrieval host does not imply issuer risk
 const hostRisk = NORMALIZATION_RISKS.find((r) => r.risk.includes('Retrieval host'));
@@ -395,9 +398,9 @@ for (const domain of OFFICIAL_PRIMARY_DOMAINS) {
   }
 }
 
-// C48: French conflict has sources with different corrected classifications
+// C48: French conflict has sources with different classifications (Gate 07C.2: resolved)
 assert(FRENCH_INTRODUCTION_CONFLICT.sourceA.classification !== FRENCH_INTRODUCTION_CONFLICT.sourceB.classification, 'C48 - sourceA and sourceB have different classifications');
-assert(FRENCH_INTRODUCTION_CONFLICT.sourceA.classification === 'AUTHORIZED_REFERENCE', 'C48 - sourceA is AUTHORIZED_REFERENCE');
+assert(FRENCH_INTRODUCTION_CONFLICT.sourceA.classification === 'OFFICIAL_CURRICULUM_DOCUMENT', 'C48 - sourceA is OFFICIAL_CURRICULUM_DOCUMENT (Gate 07C.2)');
 assert(FRENCH_INTRODUCTION_CONFLICT.sourceB.classification === 'SECONDARY_REFERENCE', 'C48 - sourceB is SECONDARY_REFERENCE');
 
 // C49: INGESTION_STATE_MACHINE includes RETIRED as a terminal state
@@ -428,10 +431,10 @@ for (const code of primarySubjects) {
   assert(matrixSubjectCodes.has(code), 'C53 - primary subject ' + code + ' appears in matrix');
 }
 
-// C54: coverage summary notes reference source authority issue
-assert(COVERAGE_SUMMARY.notes.includes('SOURCE_REQUIRED'), 'C54 - summary notes mention SOURCE_REQUIRED');
-assert(COVERAGE_SUMMARY.sourceAuthorityNote.includes('AUTHORIZED_REFERENCE'), 'C54 - sourceAuthorityNote mentions AUTHORIZED_REFERENCE');
-assert(COVERAGE_SUMMARY.sourceAuthorityNote.includes('UNVERIFIED'), 'C54 - sourceAuthorityNote mentions UNVERIFIED');
+// C54: coverage summary notes reflect Gate 07C.2 upgrade
+assert(COVERAGE_SUMMARY.notes.includes('SOURCE_VERIFIED'), 'C54 - summary notes mention SOURCE_VERIFIED (Gate 07C.2)');
+assert(COVERAGE_SUMMARY.sourceAuthorityNote.includes('OFFICIAL_CURRICULUM_DOCUMENT'), 'C54 - sourceAuthorityNote mentions OFFICIAL_CURRICULUM_DOCUMENT (Gate 07C.2)');
+assert(COVERAGE_SUMMARY.sourceAuthorityNote.includes('STRONGLY SUPPORTED'), 'C54 - sourceAuthorityNote mentions STRONGLY SUPPORTED (Gate 07C.2)');
 
 // C55: every normalization risk has required fields with correct types and non-empty values
 assert(NORMALIZATION_RISKS.length >= 7, 'C55 - at least 7 risks (got ' + NORMALIZATION_RISKS.length + ')');
@@ -476,14 +479,14 @@ assert(guide!.sourceClassification !== 'OFFICIAL_TEXTBOOK_OR_GUIDE', 'C58 - mout
 assert(guide!.sourceClassification !== 'OFFICIAL_MINISTRY', 'C58 - moutamadris host does not grant OFFICIAL_MINISTRY');
 assert(guide!.sourceClassification === 'SECONDARY_REFERENCE', 'C58 - pedagogical guide is SECONDARY_REFERENCE');
 
-// C59: profpress.net mirror does not grant OFFICIAL_CURRICULUM_DOCUMENT to src-primary-curriculum-2021
+// C59: src-primary-curriculum-2021 is OFFICIAL_CURRICULUM_DOCUMENT (Gate 07C.2: issuer authenticated)
 const curriculum = PRIMARY_CURRICULUM_SOURCES.find((s) => s.id === 'src-primary-curriculum-2021');
 assert(!!curriculum, 'C59 - src-primary-curriculum-2021 exists');
-assert(curriculum!.sourceUrl.includes('profpress.net'), 'C59 - curriculum 2021 is hosted on profpress.net');
-assert(curriculum!.sourceClassification !== 'OFFICIAL_CURRICULUM_DOCUMENT', 'C59 - profpress.net mirror does not grant OFFICIAL_CURRICULUM_DOCUMENT');
-assert(curriculum!.sourceClassification === 'AUTHORIZED_REFERENCE', 'C59 - curriculum 2021 is AUTHORIZED_REFERENCE');
+assert(curriculum!.sourceUrl.includes('profpress.net'), 'C59 - curriculum 2021 retrieval URL is on profpress.net');
+assert(curriculum!.sourceClassification === 'OFFICIAL_CURRICULUM_DOCUMENT', 'C59 - curriculum 2021 is OFFICIAL_CURRICULUM_DOCUMENT (Gate 07C.2)');
 
 // C60: sourceClassification is determined by issuer evidence, not by retrieval host domain
+// Gate 07C.2: src-primary-curriculum-2021 classified as OFFICIAL_CURRICULUM_DOCUMENT via issuer evidence (profpress.net is retrieval host, not issuer)
 for (const src of PRIMARY_CURRICULUM_SOURCES) {
   assert(!!src.sourceAuthority, 'C60 - source ' + src.id + ' has sourceAuthority');
   assert(!!src.sourceClassification, 'C60 - source ' + src.id + ' has sourceClassification');
@@ -491,11 +494,9 @@ for (const src of PRIMARY_CURRICULUM_SOURCES) {
   if (src.sourceUrl) {
     const urlHost = new URL(src.sourceUrl).hostname.replace('www.', '');
     const hostIsIndependentPortal = urlHost === 'moutamadris.ma';
-    const hostIsSecondaryMirror = urlHost === 'profpress.net';
 
-    if (hostIsIndependentPortal || hostIsSecondaryMirror) {
+    if (hostIsIndependentPortal) {
       assert(src.sourceClassification !== 'OFFICIAL_MINISTRY', 'C60 - ' + src.id + ' host ' + urlHost + ' cannot grant OFFICIAL_MINISTRY');
-      assert(src.sourceClassification !== 'OFFICIAL_CURRICULUM_DOCUMENT', 'C60 - ' + src.id + ' host ' + urlHost + ' cannot grant OFFICIAL_CURRICULUM_DOCUMENT');
       assert(src.sourceClassification !== 'OFFICIAL_TEXTBOOK_OR_GUIDE', 'C60 - ' + src.id + ' host ' + urlHost + ' cannot grant OFFICIAL_TEXTBOOK_OR_GUIDE');
     }
   }
@@ -524,12 +525,12 @@ assert(law!.notes.includes('MUST NOT be used as evidence for specific Grade'), '
 assert(vision!.notes.includes('Strategic direction'), 'C63 - vision notes mention strategic direction');
 assert(vision!.notes.includes('MUST NOT be used as evidence for specific Grade'), 'C63 - vision notes state not for grade×subject evidence');
 
-// C64: src-primary-curriculum-2021 is AUTHORIZED_REFERENCE because issuer evidence not found
+// C64: src-primary-curriculum-2021 is OFFICIAL_CURRICULUM_DOCUMENT because issuer evidence found (Gate 07C.2)
 const curriculumEvidence = SOURCE_PROVENANCE_EVIDENCE['src-primary-curriculum-2021'];
 assert(!!curriculumEvidence, 'C64 - provenance evidence exists for curriculum 2021');
-assert(curriculumEvidence.issuerEvidenceFound === false, 'C64 - issuer evidence not found for curriculum 2021');
-assert(curriculumEvidence.officialPortalListed === false, 'C64 - curriculum 2021 not listed on official portal');
-assert(curriculumEvidence.classificationRationale.includes('AUTHORIZED_REFERENCE'), 'C64 - rationale includes AUTHORIZED_REFERENCE');
+assert(curriculumEvidence.issuerEvidenceFound === true, 'C64 - issuer evidence found for curriculum 2021 (Gate 07C.2)');
+assert(curriculumEvidence.officialPortalListed === false, 'C64 - curriculum 2021 not listed on official portal (but issuer evidence is artifact-internal)');
+assert(curriculumEvidence.classificationRationale.includes('OFFICIAL_CURRICULUM_DOCUMENT'), 'C64 - rationale includes OFFICIAL_CURRICULUM_DOCUMENT (Gate 07C.2)');
 
 // C64b: src-primary-pedagogical-guide is SECONDARY_REFERENCE because host is independent
 const guideEvidence = SOURCE_PROVENANCE_EVIDENCE['src-primary-pedagogical-guide'];
@@ -545,32 +546,33 @@ for (const cell of VERIFIED_PRIMARY_COVERAGE_MATRIX) {
   }
 }
 
-// C66: all 54 cells have status SOURCE_REQUIRED (no cell is VERIFIED or PUBLISHED)
+// C66: all 54 cells have status SOURCE_VERIFIED (Gate 07C.2: source authenticated)
 for (const cell of VERIFIED_PRIMARY_COVERAGE_MATRIX) {
-  assert(cell.status === 'SOURCE_REQUIRED', 'C66 - cell ' + cell.gradeCode + '/' + cell.subjectCode + ' is SOURCE_REQUIRED');
+  assert(cell.status === 'SOURCE_VERIFIED', 'C66 - cell ' + cell.gradeCode + '/' + cell.subjectCode + ' is SOURCE_VERIFIED (Gate 07C.2)');
 }
 
-// C66b: all cells have verificationState UNVERIFIED or REVIEW_REQUIRED (none VERIFIED)
+// C66b: all cells have verificationState UNVERIFIED (Gate 07C.2: REVIEW_REQUIRED resolved)
 for (const cell of VERIFIED_PRIMARY_COVERAGE_MATRIX) {
-  assert(cell.verificationState === 'UNVERIFIED' || cell.verificationState === 'REVIEW_REQUIRED', 'C66b - cell ' + cell.gradeCode + '/' + cell.subjectCode + ' is UNVERIFIED or REVIEW_REQUIRED');
+  assert(cell.verificationState === 'UNVERIFIED', 'C66b - cell ' + cell.gradeCode + '/' + cell.subjectCode + ' is UNVERIFIED (Gate 07C.2)');
+  assert(cell.verificationState !== 'REVIEW_REQUIRED', 'C66b - cell ' + cell.gradeCode + '/' + cell.subjectCode + ' is not REVIEW_REQUIRED (Gate 07C.2)');
   assert(cell.verificationState !== 'VERIFIED', 'C66b - cell ' + cell.gradeCode + '/' + cell.subjectCode + ' is not VERIFIED');
 }
 
-// C67: French P1 cell remains REVIEW_REQUIRED with source conflict documented
+// C67: French P1 cell is now UNVERIFIED (Gate 07C.2: conflict resolved by primary source)
 const frenchP1Final = VERIFIED_PRIMARY_COVERAGE_MATRIX.find(
   (c) => c.gradeCode === 'P1' && c.subjectCode === 'FRENCH',
 );
 assert(!!frenchP1Final, 'C67 - French P1 cell exists');
-assert(frenchP1Final!.verificationState === 'REVIEW_REQUIRED', 'C67 - French P1 is REVIEW_REQUIRED');
-assert(frenchP1Final!.notes.includes('REVIEW_REQUIRED'), 'C67 - French P1 notes mention REVIEW_REQUIRED');
+assert(frenchP1Final!.verificationState === 'UNVERIFIED', 'C67 - French P1 is UNVERIFIED (Gate 07C.2)');
+assert(frenchP1Final!.notes.includes('Gate 07C.2'), 'C67 - French P1 notes mention Gate 07C.2');
 
-// C67b: French P2 cell remains REVIEW_REQUIRED with source conflict documented
+// C67b: French P2 cell is now UNVERIFIED (Gate 07C.2: conflict resolved by primary source)
 const frenchP2Final = VERIFIED_PRIMARY_COVERAGE_MATRIX.find(
   (c) => c.gradeCode === 'P2' && c.subjectCode === 'FRENCH',
 );
 assert(!!frenchP2Final, 'C67b - French P2 cell exists');
-assert(frenchP2Final!.verificationState === 'REVIEW_REQUIRED', 'C67b - French P2 is REVIEW_REQUIRED');
-assert(frenchP2Final!.notes.includes('REVIEW_REQUIRED'), 'C67b - French P2 notes mention REVIEW_REQUIRED');
+assert(frenchP2Final!.verificationState === 'UNVERIFIED', 'C67b - French P2 is UNVERIFIED (Gate 07C.2)');
+assert(frenchP2Final!.notes.includes('Gate 07C.2'), 'C67b - French P2 notes mention Gate 07C.2');
 
 // C67c: French P3-P6 cells are UNVERIFIED (not REVIEW_REQUIRED)
 for (const grade of ['P3', 'P4', 'P5', 'P6']) {

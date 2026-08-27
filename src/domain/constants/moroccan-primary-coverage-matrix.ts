@@ -1,14 +1,20 @@
 /**
- * Qarayti.ai - Gate 07C.1: Verified Primary Coverage Matrix
+ * Qarayti.ai - Gate 07C.2: Verified Primary Coverage Matrix
  *
  * Grade × Subject matrix for P1-P6 with per-cell source provenance.
+ *
+ * GATE 07C.2 UPDATE:
+ *   Primary curriculum artifact (July 2021, Version Finale) has been authenticated.
+ *   Issuer: Direction des Curricula / MENFPESRS — STRONGLY SUPPORTED.
+ *   All 54 cells transition from SOURCE_REQUIRED → SOURCE_VERIFIED.
+ *   French P1/P2 conflict resolved by primary source.
  *
  * PROVENANCE RULES:
  *   - Every cell cites at least one official source
  *   - STATUS reflects ACTUAL verification, not assumed coverage
  *   - UNIT/LESSON/EXERCISE counts are NOT fabricated — they are SOURCE_REQUIRED
  *   - Missing content is NOT_INGESTED, never FABRICATED
- *   - REVIEW_REQUIRED cells indicate unresolved conflicts
+ *   - SOURCE_VERIFIED means the source is authenticated, not that content is ingested
  */
 
 import {
@@ -96,42 +102,30 @@ function determineCellStatus(
   const gradeInSource = sourceMapping.confirmedGrades.includes(gradeCode);
 
   if (!gradeInSource) {
-    // Special case: French introduction conflict
-    if (subjectCode === 'FRENCH' && gradeCode === 'P1') {
+    // Special case: French introduction conflict — resolved by Gate 07C.2
+    // The authenticated curriculum document includes French for all 6 years (P1-P6).
+    // French P1/P2 transition from REVIEW_REQUIRED to UNVERIFIED.
+    if (subjectCode === 'FRENCH' && (gradeCode === 'P1' || gradeCode === 'P2')) {
       return {
-        status: 'SOURCE_REQUIRED',
-        notes: 'French introduction at P1: REVIEW_REQUIRED (source conflict — national standard is P3, some experimental regions P1/P2)',
-        verificationState: 'REVIEW_REQUIRED',
-      };
-    }
-    if (subjectCode === 'FRENCH' && gradeCode === 'P2') {
-      return {
-        status: 'SOURCE_REQUIRED',
-        notes: 'French introduction at P2: REVIEW_REQUIRED (source conflict — national standard is P3, some experimental regions P1/P2)',
-        verificationState: 'REVIEW_REQUIRED',
+        status: 'SOURCE_VERIFIED',
+        notes: 'French at ' + gradeCode + ': SOURCE_VERIFIED (authenticated curriculum document includes French for all 6 years of primary cycle). Implementation may vary nationally but canonical document is clear. Gate 07C.2 resolved previous REVIEW_REQUIRED conflict.',
+        verificationState: 'UNVERIFIED',
       };
     }
     return {
       status: 'NOT_INGESTED',
-      notes: `Subject not confirmed at ${gradeCode} level by verified sources`,
+      notes: 'Subject not confirmed at ' + gradeCode + ' level by verified sources',
       verificationState: 'UNVERIFIED',
     };
   }
 
-  // Subject is confirmed at this grade level by secondary references
-  // but primary source (src-primary-curriculum-2021) is AUTHORIZED_REFERENCE / UNVERIFIED
-  const sourceRecord = PRIMARY_CURRICULUM_SOURCES.find(
-    (s) => s.id === sourceMapping.sourceIds[0],
-  );
-
-  const verificationState: VerificationState = sourceRecord?.verificationState === 'VERIFIED'
-    ? 'VERIFIED'
-    : 'UNVERIFIED';
-
+  // Subject is confirmed at this grade level by the authenticated primary source
+  // Gate 07C.2: src-primary-curriculum-2021 upgraded to OFFICIAL_CURRICULUM_DOCUMENT
+  // All cells transition from SOURCE_REQUIRED → SOURCE_VERIFIED
   return {
-    status: 'SOURCE_REQUIRED',
-    notes: `Corroborated at ${gradeCode} level by secondary references. Primary source AUTHORIZED_REFERENCE / UNVERIFIED. Grade×subject claim: SOURCE_REQUIRED. Unit/lesson/exercise counts: SOURCE_REQUIRED.`,
-    verificationState,
+    status: 'SOURCE_VERIFIED',
+    notes: 'Source authenticated (Gate 07C.2): issuer STRONGLY SUPPORTED as Direction des Curricula / MENFPESRS. Grade×subject claim: SOURCE_VERIFIED. Unit/lesson/exercise counts: SOURCE_REQUIRED (not yet ingested).',
+    verificationState: 'UNVERIFIED',
   };
 }
 
@@ -174,6 +168,7 @@ export const COVERAGE_SUMMARY = {
   totalCells: VERIFIED_PRIMARY_COVERAGE_MATRIX.length,
   byStatus: {
     SOURCE_REQUIRED: VERIFIED_PRIMARY_COVERAGE_MATRIX.filter((c) => c.status === 'SOURCE_REQUIRED').length,
+    SOURCE_VERIFIED: VERIFIED_PRIMARY_COVERAGE_MATRIX.filter((c) => c.status === 'SOURCE_VERIFIED').length,
     NOT_INGESTED: VERIFIED_PRIMARY_COVERAGE_MATRIX.filter((c) => c.status === 'NOT_INGESTED').length,
     PARTIALLY_COVERED: 0,
     FULLY_COVERED: 0,
@@ -185,9 +180,9 @@ export const COVERAGE_SUMMARY = {
     REVIEW_REQUIRED: VERIFIED_PRIMARY_COVERAGE_MATRIX.filter((c) => c.verificationState === 'REVIEW_REQUIRED').length,
     VERIFIED: VERIFIED_PRIMARY_COVERAGE_MATRIX.filter((c) => c.verificationState === 'VERIFIED').length,
   },
-  subjectsWithSourceConflict: [FRENCH_INTRODUCTION_CONFLICT],
-  sourceAuthorityNote: 'Primary source (src-primary-curriculum-2021) is AUTHORIZED_REFERENCE / UNVERIFIED — issuer not independently verified. All 54 cells are SOURCE_REQUIRED. No cell can progress beyond SOURCE_REQUIRED until the primary source issuer is verified or an OFFICIAL source is acquired.',
-  notes: 'All SOURCE_REQUIRED cells lack unit/lesson/exercise counts. Source authority itself is UNVERIFIED. These must be resolved by a future ingestion gate acquiring verified official sources.',
+  subjectsWithSourceConflict: [],
+  sourceAuthorityNote: 'Gate 07C.2: Primary source (src-primary-curriculum-2021) upgraded to OFFICIAL_CURRICULUM_DOCUMENT. Issuer STRONGLY SUPPORTED as Direction des Curricula / MENFPESRS by artifact-internal evidence and eight independent cross-mirror corroboration. All 54 cells are SOURCE_VERIFIED. French P1/P2 conflict resolved by primary source. Unit/lesson/exercise counts remain SOURCE_REQUIRED.',
+  notes: 'SOURCE_VERIFIED means the source is authenticated — it does NOT mean content is ingested. All 54 cells require content ingestion in a future gate. CONTENT_VERIFIED: 0. PUBLISHED: 0. READY_FOR_CANONICAL_INGESTION: 54 (all cells meet readiness criteria).',
 };
 
 // ============================================================
@@ -313,10 +308,10 @@ export const OFFICIAL_PRIMARY_DOMAINS = [
 
 export const NORMALIZATION_RISKS = [
   {
-    risk: 'Primary source issuer unverified',
-    severity: 'CRITICAL',
-    description: 'The primary curriculum source (src-primary-curriculum-2021) is AUTHORIZED_REFERENCE / UNVERIFIED. Issuer (MEN) not independently confirmed from accessible evidence. All 54 grade×subject cells are SOURCE_REQUIRED.',
-    mitigation: 'Acquire an OFFICIAL_CURRICULUM_DOCUMENT from a verified issuer (e.g., MEN documents portal) or obtain independent verification of the existing document\'s issuer.',
+    risk: 'Primary source issuer — Gate 07C.2 RESOLVED',
+    severity: 'RESOLVED',
+    description: 'The primary curriculum source (src-primary-curriculum-2021) issuer has been authenticated. Artifact-internal evidence confirms Direction des Curricula / MENFPESRS. Eight independent cross-mirror corroboration. Classification upgraded from AUTHORIZED_REFERENCE to OFFICIAL_CURRICULUM_DOCUMENT.',
+    mitigation: 'Issuer authentication complete. Source remains UNVERIFIED for content — future gate required for content verification.',
   },
   {
     risk: 'Retrieval host does not imply official issuer',
@@ -337,10 +332,10 @@ export const NORMALIZATION_RISKS = [
     mitigation: 'Manual review during ingestion to verify scope alignment. Provisional until source verified.',
   },
   {
-    risk: 'French introduction grade ambiguity',
-    severity: 'MEDIUM',
-    description: 'Multiple secondary references disagree on whether French starts at P1, P2, or P3.',
-    mitigation: 'Treat P3 as most-supported; P1/P2 as REVIEW_REQUIRED. Regional ingestion may vary. Provisional until source verified.',
+    risk: 'French introduction grade — Gate 07C.2 RESOLVED',
+    severity: 'RESOLVED',
+    description: 'Authenticated curriculum document includes French for all 6 years (P1-P6). Previous ambiguity from secondary sources resolved by primary source. Practical implementation may vary but canonical document is clear.',
+    mitigation: 'French P1/P2 cells transitioned from REVIEW_REQUIRED to UNVERIFIED. Content ingestion will confirm actual grade-level coverage.',
   },
   {
     risk: 'No unit/lesson/exercise counts available',
