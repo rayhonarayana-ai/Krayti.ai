@@ -536,3 +536,162 @@ export type ApplicabilityConfidence =
   | 'APPLICABLE_INFERRED'       // Inferred from publication date + context
   | 'APPLICABILITY_UNKNOWN'     // No evidence for or against applicability
   | 'NOT_APPLICABLE_VERIFIED';  // Source explicitly does not apply to this period
+
+// ============================================================
+// STRUCTURAL ELEMENT TYPES (Gate 07C.4)
+// ============================================================
+
+export type SourceStructuralType =
+  | 'DOCUMENT_PART'
+  | 'DOMAIN'
+  | 'SUBJECT'
+  | 'GRADE_SECTION'
+  | 'OTHER_SOURCE_STRUCTURE';
+
+export type NormalizedStructuralType =
+  | 'DOCUMENT_PART'
+  | 'DOMAIN'
+  | 'SUBJECT'
+  | 'GRADE_SECTION'
+  | 'REVIEW_REQUIRED';
+
+export type GradeExtractionStatus =
+  | 'NOT_SCANNED'
+  | 'STRUCTURE_DISCOVERED'
+  | 'PARTIALLY_EXTRACTED'
+  | 'STRUCTURE_EXTRACTED'
+  | 'REVIEW_REQUIRED'
+  | 'BLOCKED_BY_SOURCE';
+
+// ============================================================
+// CURRICULUM STRUCTURAL ELEMENT (Gate 07C.4)
+// ============================================================
+
+export interface CurriculumStructuralElement {
+  readonly id: string;
+  readonly scopeKey: string;
+  readonly sourceId: string;
+  readonly sourceVersionId?: string;
+
+  readonly educationSystemCode: string;
+  readonly stageCode: string;
+  readonly gradeCode: string;
+  readonly subjectCode: string;
+
+  readonly sourceStructuralType: SourceStructuralType;
+  readonly sourceTerm: string;
+  readonly sourceTermAr?: string;
+  readonly sourceTermFr?: string;
+  readonly normalizedStructuralType: NormalizedStructuralType;
+
+  readonly parentElementId?: string;
+  readonly orderInSource?: number;
+
+  readonly sourceLocator: CurriculumSourceLocator;
+  readonly extractionMethod: ExtractionMethod;
+  readonly normalizationClassification: NormalizationClassification;
+
+  readonly verificationState: VerificationState;
+  readonly contentStatus: ExtractionContentStatus;
+
+  readonly temporalApplicability: {
+    readonly effectiveFrom?: string;
+    readonly effectiveTo?: string;
+    readonly academicYearFrom?: string;
+    readonly academicYearUntil?: string;
+    readonly publicationDateVerified?: boolean;
+    readonly effectiveDateConfidence: TemporalConfidence;
+  };
+
+  readonly claimRecordId?: string;
+  readonly reviewNotes?: string;
+}
+
+// ============================================================
+// EXTRACTION GAP (Gate 07C.4)
+// ============================================================
+
+export type ExtractionGapType =
+  | 'SOURCE_SECTION_UNREADABLE'
+  | 'LOCATOR_UNCERTAIN'
+  | 'STRUCTURAL_TYPE_AMBIGUOUS'
+  | 'PARENT_RELATIONSHIP_AMBIGUOUS'
+  | 'GRADE_SCOPE_UNCERTAIN'
+  | 'SUBJECT_SCOPE_UNCERTAIN'
+  | 'POSSIBLE_SUPERSESSION'
+  | 'OCR_REVIEW_REQUIRED'
+  | 'TRANSLATION_REVIEW_REQUIRED'
+  | 'SOURCE_CONFLICT';
+
+export type ExtractionGapSeverity = 'BLOCKING' | 'HIGH' | 'MEDIUM' | 'LOW';
+
+export type ExtractionGapStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'DEFERRED';
+
+export interface ExtractionGap {
+  readonly gapId: string;
+  readonly scope: string;
+  readonly sourceId: string;
+  readonly locator?: CurriculumSourceLocator;
+  readonly severity: ExtractionGapSeverity;
+  readonly reason: string;
+  readonly requiredAction: string;
+  readonly status: ExtractionGapStatus;
+  readonly notes?: string;
+}
+
+// ============================================================
+// GRADE EXTRACTION STATUS (Gate 07C.4)
+// ============================================================
+
+export interface GradeExtractionEntry {
+  readonly gradeCode: string;
+  readonly status: GradeExtractionStatus;
+  readonly subjectsExtracted: number;
+  readonly totalSubjectsExpected: number;
+  readonly structuralElementCount: number;
+  readonly verifiedClaimCount: number;
+  readonly reviewRequiredCount: number;
+  readonly notes?: string;
+}
+
+// ============================================================
+// SUBJECT EXTRACTION STATUS (Gate 07C.4)
+// ============================================================
+
+export interface SubjectExtractionEntry {
+  readonly gradeCode: string;
+  readonly subjectCode: string;
+  readonly sourcePresence: 'PRESENT' | 'ABSENT' | 'UNCERTAIN';
+  readonly structureDiscovered: boolean;
+  readonly structureExtracted: boolean;
+  readonly claimCount: number;
+  readonly verifiedClaimCount: number;
+  readonly reviewRequiredClaimCount: number;
+  readonly denominatorKnown: boolean;
+  readonly expectedStructuralElementCount?: number;
+  readonly extractedStructuralElementCount: number;
+  readonly completenessRatio?: number;
+  readonly completenessConfidence: 'VERIFIED' | 'SUPPORTED' | 'PARTIAL' | 'UNKNOWN';
+  readonly notes?: string;
+}
+
+// ============================================================
+// COMPLETENESS METRICS (Gate 07C.4)
+// ============================================================
+
+export interface StructuralExtractionMetrics {
+  readonly totalStructuralElements: number;
+  readonly byGrade: Record<string, number>;
+  readonly bySubject: Record<string, number>;
+  readonly byStructuralType: Record<string, number>;
+  readonly byExtractionMethod: Record<string, number>;
+  readonly byNormalizationClassification: Record<string, number>;
+  readonly byVerificationState: Record<string, number>;
+  readonly byContentStatus: Record<string, number>;
+  readonly reviewRequiredCount: number;
+  readonly unknownLocatorCount: number;
+  readonly exactPageLocatorCount: number;
+  readonly sectionLocatorCount: number;
+  readonly denominatorKnownCount: number;
+  readonly denominatorUnknownCount: number;
+}
