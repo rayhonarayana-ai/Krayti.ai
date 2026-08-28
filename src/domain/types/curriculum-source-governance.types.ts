@@ -1067,3 +1067,453 @@ export interface ArtifactRecoveryVerdict {
   readonly verdict: 'PASS' | 'PARTIAL' | 'FAIL';
   readonly summary: string;
 }
+
+// ============================================================
+// GATE 07C.6.2 — PRIMARY ARTIFACT TEXT DECODING + EXTRACTION READINESS
+// ============================================================
+
+// Extraction method identifiers evaluated for decoding the recovered
+// 556-page primary curriculum artifact. A method is only ever classified
+// RELIABLE / USABLE_WITH_LIMITATIONS / UNRELIABLE when it was actually
+// available and tested; unavailable methods remain UNAVAILABLE.
+export type ArtifactTextExtractionMethod =
+  | 'NODE_PDF_LIB_RAW'          // METHOD_A - existing Node/pdf-lib path
+  | 'POPPLER_PDFTOTEXT'         // METHOD_B - not installed on this host
+  | 'MUPDF_MUTOOL'              // METHOD_C - not installed on this host
+  | 'PDFBOX'                    // METHOD_D - JVM tool, not installed
+  | 'PDFJS_DIST'                // METHOD_E - alternative Node PDF parser (installed)
+  | 'DIRECT_CMAP_FONT_MAPPING'  // METHOD_F - hand-rolled CID/ToUnicode/font mapping
+  | 'RENDER_OCR';               // METHOD_G - render + OCR (last resort)
+
+export type ArtifactMethodAvailability =
+  | 'AVAILABLE'
+  | 'UNAVAILABLE';
+
+export type ArtifactMethodClassification =
+  | 'RELIABLE'
+  | 'USABLE_WITH_LIMITATIONS'
+  | 'UNRELIABLE'
+  | 'UNAVAILABLE';
+
+export type ArtifactScriptReadability =
+  | 'UNICODE_CORRECT_ORDER_CORRECT'
+  | 'UNICODE_CORRECT_ORDER_BROKEN'
+  | 'PARTIAL'
+  | 'UNREADABLE';
+
+export type ArtifactTextExtractionStatus =
+  | 'CLEAN'
+  | 'PARTIAL'
+  | 'PUA_BLOCKED'
+  | 'FRENCH_ONLY'
+  | 'EMPTY';
+
+export type ArtifactToUnicodeClassification =
+  | 'TOUNICODE_PRESENT_VALID'
+  | 'TOUNICODE_PRESENT_PARTIAL'
+  | 'TOUNICODE_PRESENT_BROKEN'
+  | 'TOUNICODE_ABSENT'
+  | 'UNKNOWN';
+
+export type ArtifactFontMappingStatus =
+  | 'MAPPED_CLEAN'
+  | 'MAPPED_PARTIAL'
+  | 'PUA_GLYPH_CODE'
+  | 'UNMAPPED'
+  | 'UNKNOWN';
+
+export type ArtifactTableExtractionReadiness =
+  | 'READY'
+  | 'PARTIAL'
+  | 'NOT_READY';
+
+export type ArtifactTextReadiness =
+  | 'READY'
+  | 'PARTIAL'
+  | 'NOT_READY';
+
+export interface ArtifactTextQualityMetrics {
+  readonly arabicCount: number;
+  readonly puaGlyphCount: number;
+  readonly replacementCharCount: number;
+  readonly latinCount: number;
+  readonly tifinaghCount: number;
+  readonly cidHexResidueCount: number;
+  readonly unresolvedCidResidue: boolean;
+  readonly hasPrivateUseGlyphCode: boolean;
+}
+
+export interface ArtifactMethodEvaluation {
+  readonly method: ArtifactTextExtractionMethod;
+  readonly available: ArtifactMethodAvailability;
+  readonly commandOrLibrary: string;
+  readonly arabicDecodeQuality: string;
+  readonly frenchDecodeQuality: string;
+  readonly tablePreservation: string;
+  readonly pageBoundaryPreservation: string;
+  readonly readingOrderQuality: string;
+  readonly diacriticsHandling: string;
+  readonly digitsHandling: string;
+  readonly punctuationHandling: string;
+  readonly performance: string;
+  readonly failureMode: string;
+  readonly classification: ArtifactMethodClassification;
+}
+
+export interface ArtifactPageExtractionResult {
+  readonly artifactId: string;
+  readonly artifactHash: string;
+  readonly pdflibPageIndex: number;
+  readonly printedPage?: string;
+  readonly category: string;
+  readonly method: ArtifactTextExtractionMethod;
+  readonly textStatus: ArtifactTextExtractionStatus;
+  readonly scriptReadability: ArtifactScriptReadability;
+  readonly tableStatus: ArtifactTableExtractionReadiness;
+  readonly fontMappingStatus: ArtifactFontMappingStatus;
+  readonly qualityMetrics: ArtifactTextQualityMetrics;
+  readonly shortVerifiedLabels: readonly string[];
+  readonly issues: readonly string[];
+}
+
+export interface ArtifactFontAuidenceEntry {
+  readonly pageContext: string;
+  readonly fontKey: string;
+  readonly subtype: string;
+  readonly toUnicodePresent: boolean;
+  readonly toUnicodeClassification: ArtifactToUnicodeClassification;
+  readonly encoding: string;
+  readonly cidSystemInfo?: string;
+  readonly embeddedFont: boolean;
+  readonly note: string;
+}
+
+export interface ArtifactPageIndexPolicy {
+  readonly pdflibPageCount: number;
+  readonly pdfjsPageCount: number;
+  readonly pdflibIsCanonical: boolean;
+  readonly printedOffsetRegion1: string;
+  readonly printedOffsetRegion2: string;
+  readonly blankUnprintedPageIndex: number;
+  readonly offsetNote: string;
+}
+
+export interface ArtifactPageDistribution {
+  readonly clean: number;
+  readonly partial: number;
+  readonly puaBlocked: number;
+  readonly frenchOnly: number;
+  readonly empty: number;
+  readonly totalPages: number;
+}
+
+export interface ArtifactExtractionReadiness {
+  readonly textReadiness: ArtifactTextReadiness;
+  readonly tableReadiness: ArtifactTableExtractionReadiness;
+  readonly textDecodingBlocker: 'RESOLVED' | 'PARTIALLY_RESOLVED' | 'BLOCKED' | 'FALLBACK_OCR_REQUIRED';
+  readonly tableExtractionBlocker: 'RESOLVED' | 'PARTIAL' | 'BLOCKED';
+  readonly selectedMethod: ArtifactTextExtractionMethod;
+  readonly fallbackMethod: ArtifactTextExtractionMethod;
+  readonly ocrRequired: boolean;
+  readonly ocrMethodUsed: boolean;
+  readonly hashBound: boolean;
+  readonly acknowledgement: string;
+}
+
+// ============================================================
+// GATE 07C.6.2A — SELECTIVE ARABIC TEXT RECOVERY PIPELINE
+// (PARTIAL + PUA-BLOCKED PRIMARY CURRICULUM PAGES)
+// ============================================================
+
+// Classification of a U+FFFD / PUA glyph-loss root cause. Determined from
+// artifact structure, never from guessing at expected words.
+export type ArtifactLossRootCause =
+  | 'EXPLICIT_TOUNICODE_FFFD'   // ToUnicode CMap explicitly maps CID -> U+FFFD
+  | 'EXPLICIT_TOUNICODE_PUA'    // ToUnicode CMap explicitly maps CID -> PUA codepoint
+  | 'MISSING_BFCHAR_ENTRY'      // ToUnicode present but no entry for a used CID
+  | 'MALFORMED_CMAP'
+  | 'UNSUPPORTED_GLYPH'
+  | 'FONT_FALLBACK'
+  | 'ENGINE_BEHAVIOR'
+  | 'CHARACTER_COMPOSITION';
+
+export type ArtifactGlyphRecoveryClass =
+  | 'RECOVERABLE'
+  | 'UNRECOVERABLE_DOC_DECLARED_LOSS'
+  | 'UNRECOVERABLE_NO_FONT_EVIDENCE'
+  | 'RECOVERABLE_VIA_ALTERNATE'
+  | 'NOT_ASSESSED';
+
+export type ArtifactFontProgramKind =
+  | 'TRUETYPE_WITH_CMAP'
+  | 'TRUETYPE_NO_CMAP'
+  | 'CFF_TYPEC'
+  | 'NON_EMBEDDED'
+  | 'UNKNOWN';
+
+export type ArtifactTableGeometryClass =
+  | 'TABLE_STRUCTURED_DIGITAL'
+  | 'TABLE_TEXT_ONLY'
+  | 'TABLE_PARTIAL'
+  | 'TABLE_UNREADABLE';
+
+export type ArtifactRecoveryPageClass =
+  | 'DIGITAL_CLEAN'
+  | 'DIGITAL_RECOVERED'
+  | 'DIGITAL_PARTIAL'
+  | 'PUA_UNRESOLVED'
+  | 'OCR_RECOVERED'
+  | 'MIXED_RECOVERY'
+  | 'FRENCH_ONLY'
+  | 'EMPTY'
+  | 'UNREADABLE'
+  | 'RESIDUAL_BLOCKED';
+
+export interface ArtifactFontRecoveryEntry {
+  readonly fontResource: string;
+  readonly baseFont: string;
+  readonly subtype: string;
+  readonly toUnicodePresent: boolean;
+  readonly roseCause: ArtifactLossRootCause;
+  readonly affectedCidsOrCodepoints: readonly string[];
+  readonly programKind: ArtifactFontProgramKind;
+  readonly programBytes: number;
+  readonly hasCmapTable: boolean;
+  readonly hasPostTable: boolean;
+  readonly fontLevelUnicodeEvidence: boolean;
+  readonly recoveryClass: ArtifactGlyphRecoveryClass;
+  readonly note: string;
+}
+
+export interface ArtifactAlternateCopy {
+  readonly alias: string;
+  readonly sha256: string;
+  readonly sizeBytes: number;
+  readonly pageCount: number;
+  readonly isByteIdenticalToPrimary: boolean;
+  readonly contentEquivalentVerified: boolean;
+  readonly mappingImprovement: boolean;
+  readonly transferPerformed: boolean;
+  readonly note: string;
+}
+
+export interface ResidualBlockerRecord {
+  readonly pageLabel: string;
+  readonly pageCategory: string;
+  readonly fontOrCmap: string;
+  readonly failureClass: ArtifactLossRootCause;
+  readonly recovery: ArtifactGlyphRecoveryClass;
+  readonly contentEquivalence: boolean;
+  readonly curriculumRelevant: boolean;
+  readonly nextAction: string;
+  readonly severity: 'LOW' | 'MEDIUM' | 'HIGH';
+  readonly status: 'BLOCKED' | 'RESOLVED' | 'DEGRADED_READABLE';
+}
+
+export interface ArtifactRecoveryReadinessMetrics {
+  readonly digitalClean: number;
+  readonly digitalRecovered: number;
+  readonly digitalPartial: number;
+  readonly puaUnresolved: number;
+  readonly ocrRecovered: number;
+  readonly mixedRecovered: number;
+  readonly frenchOnly: number;
+  readonly empty: number;
+  readonly unreadable: number;
+  readonly residualBlocked: number;
+  readonly curriculumRelevantReadyPages: number;
+  readonly curriculumRelevantBlockedPages: number;
+  readonly hashBound: boolean;
+}
+
+export interface ArtifactRecoveryModel {
+  readonly gate: string;
+  readonly artifactHash: string;
+  readonly targetClasses: readonly ArtifactTextExtractionStatus[];
+  readonly selectedMethod: ArtifactTextExtractionMethod;
+  readonly ocrEngineAvailable: boolean;
+  readonly ocrUsed: boolean;
+  readonly imageRenderingAvailable: boolean;
+  readonly alternateTransferUsed: boolean;
+  readonly digitalEvidenceExhausted: boolean;
+  readonly policy: string;
+  readonly verdict: 'PASS_DIGITAL' | 'PASS_HYBRID_OCR' | 'PARTIAL' | 'FAIL';
+}
+
+// ============================================================
+// GATE 07C.6.2B — TARGETED OCR / PAGE RECOVERY
+// ============================================================
+
+/** Per-page residual classification bucket (Gate 07C.6.2B Section 3). */
+export type ArtifactResidualPageCategory =
+  | 'CURRICULUM_RELEVANT_BLOCKED'
+  | 'NON_CURRICULUM_BLOCKED'
+  | 'GLOSSARY_REFERENCE_BLOCKED'
+  | 'DECORATIVE_ADMIN_BLOCKED'
+  | 'EMPTY';
+
+/** OCR quality state (Gate 07C.6.2B Section 11). */
+export type ArtifactOcrQuality =
+  | 'OCR_HIGH_CONFIDENCE'
+  | 'OCR_USABLE_WITH_REVIEW'
+  | 'OCR_PARTIAL'
+  | 'OCR_UNRELIABLE'
+  | 'OCR_FAILED';
+
+/** OCR vs digital classification (Gate 07C.6.2B Section 7). */
+export type ArtifactOcrClassification =
+  | 'OCR_EXTRACTED'          // only OCR produced text (no digital text)
+  | 'DIGITAL_WITH_OCR_RECOVERY' // digital kept; OCR complements the lost spans
+  | 'DIRECT_DIGITAL';        // never used for an OCR-routed page
+
+/** Table OCR status (Gate 07C.6.2B Section 12). */
+export type ArtifactTableOcrStatus =
+  | 'TABLE_OCR_STRUCTURED'
+  | 'TABLE_OCR_PARTIAL'
+  | 'TABLE_OCR_TEXT_ONLY'
+  | 'TABLE_OCR_UNRELIABLE';
+
+/** Per-subject extraction readiness (Gate 07C.6.2B Section 17). */
+export type ArtifactSubjectReadinessState =
+  | 'READY_DIGITAL'
+  | 'READY_HYBRID'
+  | 'PARTIAL'
+  | 'BLOCKED'
+  | 'NOT_YET_INDEXED';
+
+export interface ArtifactResidualPageRecord {
+  readonly pdfIndex: number;
+  readonly printedPage?: number;
+  readonly section: string;
+  readonly subject?: string;
+  readonly grade?: string;
+  readonly failureClass: ArtifactLossRootCause | 'NONE';
+  readonly fontCmapCluster: string;
+  readonly curriculumRelevance: 'CURRICULUM' | 'REFERENCE' | 'NON_CURRICULUM' | 'EMPTY';
+  readonly whyOcrRequired: string;
+  readonly ocrQuality: ArtifactOcrQuality;
+  readonly ocrClassification: ArtifactOcrClassification;
+  readonly ocrRecovered: boolean;
+  readonly blocking: boolean;
+  readonly ocrTextAvailable: boolean;
+}
+
+export interface ArtifactOcrProvenance {
+  readonly artifactHash: string;
+  readonly pdfIndex: number;
+  readonly printedPage?: number;
+  readonly renderResolutionWidth: number;
+  readonly renderMethod: string;
+  readonly ocrEngine: string;
+  readonly ocrEngineVersion: string;
+  readonly language: string;
+  readonly classification: ArtifactOcrClassification;
+  readonly reviewed: boolean;
+}
+
+export interface ArtifactSubjectReadiness {
+  readonly subject: string;
+  readonly state: ArtifactSubjectReadinessState;
+  readonly extractionPath: string;
+  readonly note: string;
+}
+
+export interface ArtifactOcrRecoveryEvidence {
+  readonly gate: '07C.6.2B';
+  readonly artifactHash: string;
+  readonly rendererAvailable: boolean;
+  readonly renderer: string;
+  readonly ocrEnginesAvailable: readonly string[];
+  readonly ocrUsed: boolean;
+  readonly ocrPageCount: number;
+  readonly processedPages: readonly number[];
+  readonly representativeSamples: readonly ArtifactOcrProvenance[];
+  readonly qualityCounts: Readonly<Record<ArtifactOcrQuality, number>>;
+  readonly noLlmRepair: boolean;
+  readonly glossaryBlocking: 'REQUIRED_FOR_CURRICULUM_EXTRACTION' | 'NON_BLOCKING_REFERENCE_SECTION';
+  readonly preambleBlocking: 'REQUIRED_FOR_CURRICULUM_EXTRACTION' | 'NON_BLOCKING_FOR_DEEP_EXTRACTION';
+  readonly tableOcrStatus: ArtifactTableOcrStatus;
+  readonly policy: string;
+  readonly verdict: 'PASS' | 'PARTIAL' | 'FAIL';
+}
+
+// ============================================================
+// GATE 07C.6.2C — FINAL CURRICULUM-RELEVANT READINESS COVERAGE AUDIT
+// ============================================================
+
+/** Top-level relevance class assigned to every physical page (exactly one per page; gate sum = 556). */
+export type ArtifactRelevanceClass =
+  | 'CURRICULUM_REQUIRED'
+  | 'CURRICULUM_SUPPORTING'
+  | 'REFERENCE_NON_BLOCKING'
+  | 'ADMINISTRATIVE_NON_BLOCKING'
+  | 'EMPTY'
+  | 'UNKNOWN_RELEVANCE';
+
+export interface ArtifactPageUniverse {
+  readonly gate: '07C.6.2C';
+  readonly physicalPages: number;
+  readonly pdfjsPages: number;
+  readonly pdfLibPages: number;
+  readonly windowsPages: number;
+  readonly unaccounted: number;
+  readonly tiers: Readonly<Record<ArtifactRelevanceClass, number>>;
+  readonly ninePage6dot3SetName: string;
+  readonly ninePage6dot3Set: readonly number[];
+  readonly idx0Status: string;
+  readonly idx555Status: string;
+  readonly idx215Status: string;
+}
+
+export type ArtifactOcrCoverageStatus =
+  | 'PAGE_OCR_RECOVERED'
+  | 'PAGE_OCR_PIPELINE_VALIDATED_ON_SAMPLE'
+  | 'PAGE_NOT_PROCESSED';
+
+export interface ArtifactPageOcrCoverageRecord {
+  readonly physicalPage: number;
+  readonly pdfIndex: number;
+  readonly printedPage?: number;
+  readonly section: string;
+  readonly subject?: string;
+  readonly classification: ArtifactOcrClassification;
+  readonly ocrRecovered: boolean;
+  readonly ocrQuality: ArtifactOcrQuality;
+  readonly coverageStatus: ArtifactOcrCoverageStatus;
+}
+
+export interface ArtifactRequiredPageMetrics {
+  readonly pagesRequired: number;
+  readonly pagesReady: number;
+  readonly pagesBlocked: number;
+  readonly pagesUnknown: number;
+  readonly requiredPages: readonly number[];
+  readonly blockedPages: readonly number[];
+  readonly unknownPages: readonly number[];
+}
+
+export interface ArtifactSubjectReadinessAudit {
+  readonly subject: string;
+  readonly state: ArtifactSubjectReadinessState;
+  readonly location: string;
+  readonly digitalClean: boolean;
+  readonly note: string;
+}
+
+export interface ArtifactRequiredTableRecord {
+  readonly tableId: string;
+  readonly description: string;
+  readonly physicalPages: readonly number[];
+  readonly inspection: 'TABLE_READY_WITH_REVIEW' | 'TABLE_EXTRACTION_PARTIAL' | 'TABLE_NOT_SAFELY_INSPECTABLE';
+  readonly geometryAvailable: boolean;
+  readonly note: string;
+}
+
+export interface ArtifactCoverageVerdict {
+  readonly gate: '07C.6.2C';
+  readonly musicResolved: boolean;
+  readonly pagesRequiredBlocked: number;
+  readonly pagesRequiredUnknown: number;
+  readonly requiredTablesSafe: boolean;
+  readonly recommendation: 'PASS' | 'PARTIAL' | 'FAIL';
+}
