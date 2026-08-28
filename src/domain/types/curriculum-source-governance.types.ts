@@ -1653,3 +1653,179 @@ export interface DirectEvidenceGateVerdict {
   readonly masteryDerived: boolean;          // false
   readonly recommendation: 'PASS' | 'PARTIAL' | 'FAIL';
 }
+
+// ============================================================
+// GATE 07C.6.4 — CANONICAL PRIMARY CURRICULUM STRUCTURE RECONCILIATION
+// ============================================================
+// Reconciles the APPLICATION curriculum catalog with the SOURCE-NATIVE
+// structure directly proven by the authenticated 2021 primary artifact
+// (see 07C.6.3 evidence). The primary artifact structure is authoritative:
+// application-catalog convenience must NOT overwrite source truth.
+//
+// This gate creates DOMAIN TRUTH / MODELING ONLY (§21). It does not change
+// UI/routing/learner-state/exercises, does not write to a database, and does
+// NOT redesign or delete the existing application catalog (§4). Subject codes
+// such as MUSIC / CIVIC_EDUCATION / ART remain valid application identifiers;
+// a reconciliation/mapping layer exposes how each maps to the source-native
+// structure — even when the mapping is not 1:1 (§6/§8/§9/§20).
+
+// --- Subject namespaces (explicitly separated, §6) ---------------------
+// SOURCE_SUBJECT (source-native, artifact authority) vs
+// APPLICATION_SUBJECT (retained app catalog code).
+
+export type SourceNativeSubjectCode =
+  | 'SRC_LANGUAGES'        // Languages domain (العربية/الأمازيغية/الفرنسية) — 4-skill model
+  | 'SRC_ARABIC'
+  | 'SRC_FRENCH'
+  | 'SRC_MATH'             // الرياضيات
+  | 'SRC_SCIENCE'          // النشاط العلمي
+  | 'SRC_ISLAMIC'          // التربية الإسلامية
+  | 'SRC_ART'              // التربية الفنية
+  | 'SRC_SPORT'            // التربية البدنية
+  | 'SRC_SOCIAL_STUDIES';  // الاجتماعيات (ت.ج تاريخ وجغرافيا + ت.م تربية مدنية)
+
+export type ApplicationSubjectCode =
+  | 'ARABIC'
+  | 'FRENCH'
+  | 'MATH'
+  | 'SCIENCE'
+  | 'ISLAMIC_EDUCATION'
+  | 'CIVIC_EDUCATION'
+  | 'SPORT'
+  | 'ART'
+  | 'MUSIC';
+
+// --- Source-native structural forms (§5/§12) ---------------------------
+// Different subjects use different structural forms. There is NO universal
+// UNIT abstraction forced on every subject.
+
+export type SourceNativeStructuralForm =
+  | 'SKILL'                  // Languages 4-skill model (الاستماع، التحدث، القراءة، الكتابة)
+  | 'COMPONENT'              // Math (3), Science (4) components
+  | 'APPROACH'               // Islamic Education مداخل (entry/مدخل forms)
+  | 'SUB_AREA'               // Art (5) and Sport (2) sub-areas
+  | 'GROUPED_SUBJECT_AREA'   // Social Studies grouping (تاريخ وجغرافيا / تربية مدنية)
+  | 'NONE_IDENTIFIED';
+
+// --- Mapping relationship between source and application subject (§7) ---
+// A source subject may map to application subjects 1:1, 1:many, many:1,
+// component-of, replacement-of, semantic-equivalent, or no-direct-match.
+// Mappings are NOT assumed to be 1:1.
+
+export type SourceApplicationMappingRelationship =
+  | 'DIRECT_MATCH'           // application code aligns 1:1 with a source subject
+  | 'SEMANTIC_EQUIVALENT'    // same referent, differing terminology (e.g. الكتابة == written production)
+  | 'COMPONENT_OF'           // application subject maps to a component of a source subject (MUSIC ⊂ التربية الفنية)
+  | 'GROUPED_UNDER'          // source groups elements (ت.ج history+geography) — app exposes them separately
+  | 'REPLACED_BY'            // app term reflects a source-model transition (التربية على المواطنة → التربية المدنية)
+  | 'APPLICATION_SPLIT'      // one source element exposed through multiple app views
+  | 'SOURCE_SPLIT'           // app combines what source splits (e.g. ARABIC_LISTENING_SPEAKING vs الاستماع+التحدث)
+  | 'NO_DIRECT_MATCH'        // no direct application counterpart in the reviewed evidence
+  | 'NOT_APPLICABLE';        // subject/scope not present in the source for this scope
+
+// --- Mapping / reconciliation status (§18) -----------------------------
+export type ReconciliationMappingStatus =
+  | 'VERIFIED_DIRECT'
+  | 'VERIFIED_SEMANTIC'
+  | 'PARTIAL'
+  | 'MISMATCH'
+  | 'NOT_APPLICABLE'
+  | 'UNRESOLVED';
+
+// --- Source-native structural element (§16 canonical identity) ---------
+// A stable identity derived from SEMANTIC SOURCE SCOPE, not display wording
+// alone. Page number is provenance, NOT the primary identity.
+
+export interface SourceNativeStructureElement {
+  readonly structuralElementId: string;      // stable semantic identity
+  readonly educationSystemCode: string;      // e.g. 'MOROCCO'
+  readonly stageCode: string;                // e.g. 'PRIMARY'
+  readonly sourceSubject: SourceNativeSubjectCode;
+  readonly sourceSubjectNameAr: string;      // artifact wording (authoritative)
+  readonly sourceSubjectNameFr: string;
+  readonly structuralForm: SourceNativeStructuralForm;
+  readonly sourceElementKey: string;         // canonical semantic key within the source subject
+  readonly nameAr: string;                   // source wording (authoritative)
+  readonly nameFr: string;                   // source wording / internal alias may differ (English internal names remain aliases, §15)
+  readonly internalName?: string;            // optional English/internal alias — NOT authority
+  readonly gradeScope: readonly string[];    // P1..P6 as applicable
+  readonly sourceVersionId: string;
+  readonly comments?: string;
+}
+
+// --- A reconciliation mapping row (application subject ↔ source) --------
+export interface SourceApplicationMapping {
+  readonly applicationSubject: ApplicationSubjectCode;
+  readonly applicationSubjectNameAr: string;
+  readonly sourceSubject: SourceNativeSubjectCode;
+  readonly sourceSubjectNameAr: string;      // artifact wording (authoritative)
+  readonly mappingRelationship: SourceApplicationMappingRelationship;
+  readonly mappingStatus: ReconciliationMappingStatus;
+  readonly sourceStructuralForm: SourceNativeStructuralForm;
+  readonly sourceComponents: readonly string[]; // source-native component keys for this mapping
+  readonly gradeScope: readonly string[];    // grades this mapping applies to
+  readonly denominatorState: DirectDenominatorCellState; // VERIFIED/PARTIAL/UNKNOWN/NOT_APPLICABLE (frozen, §23)
+  readonly mismatch: string;                 // explicit mismatch description (empty if none)
+  readonly provenance: readonly PrimaryDirectProvenance[];
+  readonly futureAction: string;
+}
+
+// --- A source-native structure registry entry (§27) ---------------------
+export interface SourceNativeStructureRecord {
+  readonly sourceSubject: SourceNativeSubjectCode;
+  readonly structureNameAr: string;
+  readonly structuralForm: SourceNativeStructuralForm;
+  readonly componentKeys: readonly string[]; // keys of the elements covered by this structure
+  readonly gradeScope: readonly string[];
+  readonly comment: string;
+}
+
+// --- Future extraction contract (§28/§29) ------------------------------
+// Specifies how the NEXT extraction stage must consume this layer.
+// Content MUST attach to the source-native structural identity FIRST;
+// application-catalog mapping is SECONDARY.
+export interface FutureExtractionContractRules {
+  readonly attachContentToSourceNativeIdentityFirst: boolean;
+  readonly applicationMappingIsSecondary: boolean;
+  readonly neverFlattenSourceHierarchyDuringExtraction: boolean;
+  readonly noSourceElementDuplicationAcrossApplicationViews: boolean;
+  readonly ruleDescription: string;
+}
+
+// --- Structural mismatch issue (§25) ------------------------------------
+// This gate may record a new explicit modeling issue without reopening the
+// already-justified gap states GAP-001..004.
+export type StructuralMismatchIssueType =
+  | 'SOURCE_APPLICATION_STRUCTURE_MISMATCH'
+  | 'FUTURE_PERSISTENCE_REQUIREMENT';
+
+export interface StructuralMismatchIssue {
+  readonly issueType: StructuralMismatchIssueType;
+  readonly subject: string;
+  readonly description: string;
+  readonly resolutionConstraint: string;
+}
+
+// --- Overall Gate 07C.6.4 verdict --------------------------------------
+export interface CanonicalReconciliationVerdict {
+  readonly gate: '07C.6.4';
+  readonly sourceSubjects: number;
+  readonly applicationSubjects: number;
+  readonly directlyReconciled: number;        // VERIFIED_DIRECT / VERIFIED_SEMANTIC mappings
+  readonly partialOrMismatch: number;         // PARTIAL / MISMATCH mappings
+  readonly noDirectMatch: number;             // NO_DIRECT_MATCH / NOT_APPLICABLE mappings
+  readonly verifiedCells: number;             // 42 (frozen, §23)
+  readonly supportedCells: number;            // 0
+  readonly partialCells: number;              // 3
+  readonly unknownCells: number;              // 6
+  readonly notApplicableCells: number;        // 3
+  readonly totalCells: number;                // 54
+  readonly contentVerified: number;           // 0
+  readonly published: number;                 // 0
+  readonly structureCompleteVerified: number; // 0
+  readonly masteryDerived: boolean;           // false
+  readonly noRuntimeBehaviorChange: boolean;  // true (§21)
+  readonly noDatabaseChange: boolean;         // true (§22)
+  readonly sourceNativeFirst: boolean;        // true (§28)
+  readonly recommendation: 'PASS' | 'PARTIAL' | 'FAIL';
+}
