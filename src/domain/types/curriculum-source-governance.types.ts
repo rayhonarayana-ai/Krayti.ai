@@ -1517,3 +1517,139 @@ export interface ArtifactCoverageVerdict {
   readonly requiredTablesSafe: boolean;
   readonly recommendation: 'PASS' | 'PARTIAL' | 'FAIL';
 }
+
+// ============================================================
+// GATE 07C.6.3 — DIRECT PRIMARY ARTIFACT EVIDENCE VERIFICATION
+// ============================================================
+// Verifies direct primary source evidence for component candidates,
+// denominator cells, subject/component/program structure, and
+// source-page provenance — all against the authenticated 2021 primary
+// curriculum artifact (hash-bound), using the OCR-recovered required pages.
+//
+// EVIDENCE DISCIPLINE (§4/§10/§18):
+//   - No guessing / no reconstruction from expected curriculum knowledge.
+//   - A cell resolves to VERIFIED only with DIRECT primary source evidence
+//     and a clearly-visible enumerable structure (oracle labels).
+//   - Ambiguous row/column/cell association -> HUMAN_REVIEW_REQUIRED,
+//     never VERIFIED.
+//   - Catalog is NOT redesigned this gate: the pre-existing 9-subject grid
+//     is retained and source-model mismatches are recorded explicitly.
+
+/** Cross-reference comparison outcome for each provisional candidate (§16). */
+export type CrossReferenceComparisonStatus =
+  | 'MATCH'                                  // candidate aligns 1:1 with a direct source structure
+  | 'SEMANTIC_MATCH'                         // same referent, source uses equivalent terminology
+  | 'PARTIAL_MATCH'                          // candidate partially reflected by the source structure
+  | 'NO_MATCH'                               // no direct source evidence for the candidate
+  | 'PRIMARY_SOURCE_USES_DIFFERENT_STRUCTURE'; // catalog/structure mismatch recorded, not silently corrected
+
+/** Direct evidence verification verdict for a candidate or cell. */
+export type DirectEvidenceVerdict =
+  | 'DIRECTLY_VERIFIED'                      // direct, clearly-visible source evidence
+  | 'DIRECTLY_VERIFIED_EQUIVALENT'           // verified via a source-equivalent label
+  | 'PARTIALLY_CONFIRMED'                    // source reflects part of the candidate only
+  | 'NOT_APPLICABLE'                         // no such structure/subject in the source for this scope
+  | 'HUMAN_REVIEW_REQUIRED'                  // ambiguous association / OCR not clean enough
+  | 'NOT_VERIFIED';                          // no direct primary evidence reached
+
+/** Denoted structural category type observed directly in the artifact. */
+export type DirectStructuralCategoryType =
+  | 'UNIFIED_SKILL'
+  | 'COMPONENT'
+  | 'APPROACH'
+  | 'SUB_AREA'
+  | 'SUBJECT_GROUP'
+  | 'NONE_IDENTIFIED';
+
+/** Per-grade denominator cell state after direct primary verification. */
+export type DirectDenominatorCellState =
+  | 'VERIFIED'                               // direct source-denominated count, clearly enumerable
+  | 'PARTIAL'                                // structure partially identified; complete set not proven
+  | 'UNKNOWN'                                // no defensible direct denominator
+  | 'NOT_APPLICABLE';                        // subject/component not present in this grade scope
+
+/** Direct primary provenance for a verified structural claim. */
+export interface PrimaryDirectProvenance {
+  readonly physicalPage: number;
+  readonly scannedIndex?: number;            // pdfjs/scan basis (physical n = scan n-1)
+  readonly printedPage?: string;
+  readonly tableId?: string;                 // T01..T07
+  readonly blockLabel: string;               // short, non-content locator label
+  readonly sourceWordingAr?: string;         // short verified label only (never full-page text)
+  readonly rowColumnNote: string;            // how header/row/column/cell association was confirmed
+  readonly ocrQuality: 'OCR_USABLE_WITH_REVIEW' | 'OCR_HIGH_CONFIDENCE';
+}
+
+/** A verified structural category directly observed in the artifact. */
+export interface PrimaryDirectComponent {
+  readonly componentCode: string;
+  readonly nameAr: string;
+  readonly nameFr: string;
+  readonly categoryType: DirectStructuralCategoryType;
+  readonly grades: readonly string[];
+  readonly evidenceStatus: DirectEvidenceVerdict;
+  readonly provenance: readonly PrimaryDirectProvenance[];
+}
+
+/** 15-candidate cross-reference reconciliation record. */
+export interface DirectCandidateVerification {
+  readonly candidateCode: string;            // from SUBJECT_COMPONENTS
+  readonly subjectCode: string;
+  readonly candidateNameAr: string;
+  readonly comparisonStatus: CrossReferenceComparisonStatus;
+  readonly verdict: DirectEvidenceVerdict;
+  readonly sourceEquivalentCode?: string;    // artifact-level equivalent code when different
+  readonly sourceEquivalentNameAr?: string;
+  readonly evidencePage: number | undefined;
+  readonly evidenceNote: string;
+}
+
+/** A single grade × subject denominator cell (54 total). */
+export interface DirectDenominatorCell {
+  readonly gradeCode: string;
+  readonly subjectCode: string;
+  readonly state: DirectDenominatorCellState;
+  readonly denominatorType: DenominatorType;
+  readonly sourceCount: number | undefined;
+  readonly sourceCountDescription: string;   // e.g. "4 unified skills (استماع، تحدث، قراءة، كتابة)"
+  readonly provable: boolean;
+  readonly provenancePages: readonly number[];
+  readonly mismatchRecorded: boolean;
+  readonly note: string;
+}
+
+/** Required-table inspection outcome (T01..T07). */
+export interface RequiredTableInspection {
+  readonly tableId: string;
+  readonly description: string;
+  readonly physicalPages: readonly number[];
+  readonly evidenceRead: boolean;
+  readonly associationClear: 'CLEAR' | 'AMBIGUOUS' | 'NOT_REQUIRED';
+  readonly usableForDenominators: boolean;
+  readonly note: string;
+}
+
+/** Gap-state bookkeeping re-evaluated with direct evidence (§25). */
+export interface DirectGapEvaluation {
+  readonly gapId: string;
+  readonly afterState: 'RESOLVED' | 'PARTIALLY_RESOLVED' | 'UNCHANGED' | 'NOT_APPLICABLE';
+  readonly directEvidenceDescription: string;
+  readonly unchangedFromPrior: boolean;
+}
+
+/** Overall Gate 07C.6.3 verdict. */
+export interface DirectEvidenceGateVerdict {
+  readonly gate: '07C.6.3';
+  readonly verifiedCells: number;
+  readonly partialCells: number;
+  readonly unknownCells: number;
+  readonly notApplicableCells: number;
+  readonly totalCells: number;               // 54
+  readonly verifiedCandidates: number;
+  readonly totalCandidates: number;          // 15
+  readonly contentVerified: number;          // 0
+  readonly published: number;                // 0
+  readonly structureCompleteVerified: number; // 0
+  readonly masteryDerived: boolean;          // false
+  readonly recommendation: 'PASS' | 'PARTIAL' | 'FAIL';
+}
