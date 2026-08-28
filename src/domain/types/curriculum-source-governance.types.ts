@@ -1829,3 +1829,167 @@ export interface CanonicalReconciliationVerdict {
   readonly sourceNativeFirst: boolean;        // true (§28)
   readonly recommendation: 'PASS' | 'PARTIAL' | 'FAIL';
 }
+
+// ============================================================
+// GATE 07C.7 — CONTROLLED PRIMARY CURRICULUM
+// CONTENT EXTRACTION FOUNDATION
+// ============================================================
+// Establishes the trusted foundation for moving PRIMARY ARTIFACT content
+// through: PRIMARY ARTIFACT -> SOURCE-NATIVE STRUCTURE -> SOURCE CONTENT
+// CLAIM -> PROVENANCE -> REVIEW STATE -> APPLICATION MAPPING.
+//
+// The controlled pilot extracts a SMALL, honest vertical slice (one grade,
+// one source-native subject, one structural component). It does NOT
+// fabricate lessons/KOs/exercises/units and does NOT publish unverified
+// content (CONTENT_VERIFIED stays 0, §3 content freeze).
+//
+// CONTENTS ARE ATTACHED TO THE SOURCE-NATIVE STRUCTURAL IDENTITY FIRST
+// (§4/§18/§28); application-catalog mapping is downstream metadata (§19).
+// No duplicate source truth is created from tables/prose/multi-app-mapping
+// (§24). No synthetic knowledge objects are generated (§8).
+
+export type ContentClaimCategory =
+  | 'OBJECTIVE'                 // what the learner is to acquire/do
+  | 'LEARNING_OUTCOME'          // expected demonstrable outcome
+  | 'COMPETENCY_STATEMENT'      // statement framed as a competency
+  | 'CONTENT_THEME'             // thematic subject-matter organization
+  | 'CONTENT_ELEMENT'           // a specific content item/notion
+  | 'METHODOLOGICAL_GUIDANCE'   // how the teaching/learning is conducted
+  | 'ACTIVITY_TYPE'             // a named/described classroom activity kind
+  | 'ASSESSMENT_GUIDANCE'       // how understanding is verified/assessed
+  | 'TEMPORAL_ALLOCATION'       // time/schedule allocation guidance
+  | 'STRUCTURAL_DESCRIPTION';   // structural organization description
+
+// Content-claim provenance. `extractionClass` is the artifact-level routing
+// classification (DIRECT_DIGITAL / DIGITAL_WITH_OCR_RECOVERY / OCR_EXTRACTED,
+// §14). DIRECT_DIGITAL must never be used for an OCR-routed page.
+export interface SourceContentClaimProvenance {
+  readonly physicalPage: number;             // physical page (index+1)
+  readonly scannedIndex: number;             // pdfjs/scan basis (physical - 1)
+  readonly printedPage: string;              // printed footer page
+  readonly tableId?: string;                 // T-code when the cell is in a table
+  readonly blockLabel: string;               // short, non-content locator label
+  readonly cellLabel: string;                // row/column cell label (e.g. "الأعداد الصحيحة الطبيعية — P1")
+  readonly rowColumnNote: string;            // how the cell association was confirmed
+  readonly extractionClass: ArtifactOcrClassification; // DIRECT_DIGITAL for the pilot pages
+}
+
+// Closed Gate-07C.7 source-topic discriminator — a FINER pilot provenance
+// locator within the el-math-numbers structural component. It is NOT the
+// structural identity (that remains structuralElementId) and NOT an
+// application taxonomy. Each topic resolves to ONE authorized page triple in
+// the matrix.
+export type GateSourceTopic =
+  | 'NUMBERS'                   // الأعداد            — 331 / 332 / 334
+  | 'ADDITION_SUBTRACTION'      // الجمع والطرح        — 332 / 333 / 335
+  | 'MULTIPLICATION'            // الضرب              — 333 / 334 / 336
+  | 'DIVISION';                 // القسمة             — 334 / 335 / 337
+
+
+// A single source-native content claim extracted from the authenticated
+// primary artifact. Reuses existing VERIFICATION / PROVENANCE / PUBLICATION
+// primitives; only the content-category identity is new (§6/§7).
+export interface SourceContentClaim {
+  readonly claimId: string;                  // stable content-claim identity (E-group)
+  readonly category: ContentClaimCategory;
+  readonly sourceTopic: GateSourceTopic;        // NUMBERS / ADDITION_SUBTRACTION / MULTIPLICATION / DIVISION
+  readonly educationSystemCode: string;      // MOROCCO
+  readonly stageCode: string;                // PRIMARY
+  readonly gradeCode: string;                // P1 (pilot is ONE grade)
+  readonly structuralElementId: string;      // -> el-math-numbers (source-native, §18/§28)
+  readonly sourceSubject: SourceNativeSubjectCode; // SRC_MATH
+  readonly applicationSubjectCode: ApplicationSubjectCode; // downstream/secondary (§19)
+  readonly sourceVersionId: string;          // v1.0.0
+  readonly sourceClassification: SourceClassification; // OFFICIAL_CURRICULUM_DOCUMENT
+
+  readonly sourceWordingAr: string;          // minimal short wording only (§26)
+  readonly normalizedValueAr: string;        // normalized claim value
+  readonly normalizationClassification: NormalizationClassification;
+
+  readonly extractionMethod: ExtractionMethod; // DIRECT_STRUCTURED_EXTRACTION
+  readonly provenance: SourceContentClaimProvenance;
+
+  // GRADE-CELL ATTRIBUTION: whether the artifact geometry confirms that this
+  // cell belongs to the gradeCode candidate (P1). This is SEPARATE from page
+  // provenance (correct page != confirmed cell grade). gradeCode always states
+  // the PILOT CANDIDATE SCOPE; attributionStatus records whether the source
+  // evidence has actually confirmed that grade assignment as curriculum truth.
+  readonly attributionStatus: ContentClaimAttributionStatus;
+
+  readonly verificationState: VerificationState; // UNVERIFIED / REVIEW_REQUIRED / REJECTED
+  readonly contentStatus: ExtractionContentStatus; // EXTRACTED_UNVERIFIED / REVIEW_REQUIRED
+  readonly confidence: 'HIGH' | 'MODERATE' | 'LOW' | 'UNVERIFIED';
+  readonly notes?: string;
+}
+
+// Closed grade-cell attribution classification (Gate 07C.7 pilot).
+//   CLEAR_P1_ATTRIBUTION -> the source cell is geometrically attributable to the
+//                           P1 (السنة الأولى) column; candidate grade assignment
+//                           is SUPPORTED (still not CONTENT_VERIFIED).
+//   REVIEW_REQUIRED       -> the candidate P1 grade assignment is NOT established
+//                           as curriculum truth by the source evidence; kept only
+//                           as a review candidate.
+//   REJECTED              -> cannot remain as a retained P1 extraction claim.
+export type ContentClaimAttributionStatus =
+  | 'CLEAR_P1_ATTRIBUTION'
+  | 'REVIEW_REQUIRED'
+  | 'REJECTED';
+
+// Controlled-pilot declaration (§11-§13). Declared BEFORE extraction.
+export interface ContentClaimPilotDeclaration {
+  readonly pilotId: string;
+  readonly gate: '07C.7';
+  readonly gradeCode: 'P1';
+  readonly sourceSubject: 'SRC_MATH';
+  readonly structuralElementId: 'el-math-numbers';
+  readonly structuralElementNameAr: string;
+  readonly extractionMethod: 'DIRECT_STRUCTURED_EXTRACTION';
+  readonly extractionClass: 'DIRECT_DIGITAL';
+  readonly physicalPageRange: string;
+  readonly printedPageRange: string;
+  readonly scannedIndexRange: string;
+  readonly expectedClaimCategories: readonly ContentClaimCategory[];
+  readonly why: string;
+  readonly ocrState: string;
+}
+
+// Ledger of a controlled extraction: claims + safety counters (§24).
+export interface ContentClaimLedger {
+  readonly pilotId: string;
+  readonly claims: readonly SourceContentClaim[];
+  readonly claimCount: number;
+  // Attribution state derived from the claim registry (step 11-F): these MUST
+  // mirror the claims array, so report counts and registry state cannot diverge.
+  readonly clearP1AttributionCount: number;   // attributionStatus === CLEAR_P1_ATTRIBUTION
+  readonly reviewRequiredAttributionCount: number; // attributionStatus === REVIEW_REQUIRED
+  readonly rejectedAttributionCount: number;  // attributionStatus === REJECTED
+  readonly extractedUnverifiedCount: number; // contentStatus === EXTRACTED_UNVERIFIED
+  readonly reviewRequiredContentCount: number; // contentStatus === REVIEW_REQUIRED
+  readonly directSourceConfirmedCount: number; // must stay 0 unless separately proven
+  readonly contentVerifiedCount: number;     // MUST stay 0 (§3)
+  readonly publishedCount: number;           // MUST stay 0 (§3)
+  readonly contentDenominatorKnown: boolean; // false => completeness UNMEASURABLE (§23)
+  readonly completenessStatus: 'MEASURABLE' | 'UNMEASURABLE';
+  readonly syntheticLessons: number;         // MUST stay 0 (§8)
+  readonly syntheticKnowledgeObjects: number; // MUST stay 0 (§8)
+  readonly syntheticExercises: number;       // MUST stay 0 (§8)
+}
+
+// Overall Gate 07C.7 verdict.
+export interface ControlledContentExtractionVerdict {
+  readonly gate: '07C.7';
+  readonly pilotId: string;
+  readonly claimCount: number;
+  readonly contentVerified: number;          // 0
+  readonly published: number;                // 0
+  readonly structureCompleteVerified: number; // 0
+  readonly masteryDerived: boolean;          // false
+  readonly sourceNativeFirst: boolean;       // true
+  readonly applicationMappingIsSecondary: boolean; // true (§19)
+  readonly exactlyOneGrade: boolean;
+  readonly exactlyOneSubject: boolean;
+  readonly noSyntheticUnitsLessonsKOsOrExercises: boolean;
+  readonly completenessUnmeasurable: boolean; // true (§23)
+  readonly denominatorFrozenVerbatim: boolean; // 42/0/3/6/3 preserved (§2)
+  readonly recommendation: 'PASS' | 'PARTIAL' | 'FAIL';
+}
