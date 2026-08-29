@@ -2929,3 +2929,117 @@ export interface PublicationReadinessLedger {
   readonly negativeControlExcludedCount: number;
   readonly publishedCount: number;
 }
+
+// ============================================================
+// GATE 07C.13 — AUTHORITATIVE CURRENTNESS EVIDENCE
+// ============================================================
+
+export type SourceCurrentnessEvidenceClass =
+  | 'EXPLICIT_CURRENTNESS_CONFIRMATION'
+  | 'EXPLICIT_SUPERSESSION'
+  | 'SCOPE_SPECIFIC_CONTINUITY'
+  | 'SCOPE_SPECIFIC_REPLACEMENT'
+  | 'SUCCESSOR_EQUIVALENCE_CONFIRMED'
+  | 'REFORM_WITHOUT_CURRICULUM_SUPERSESSION'
+  | 'LATEST_OFFICIAL_SOURCE_ONLY'
+  | 'OFFICIAL_INSTITUTIONAL_CORROBORATION_ONLY'
+  | 'SECONDARY_CORROBORATION_ONLY'
+  | 'CONTRADICTORY_EVIDENCE'
+  | 'INSUFFICIENT_EVIDENCE'
+  | 'OFFICIAL_SOURCE_DISCOVERED_NOT_RECOVERED';
+
+export type CurrentnessAuthorityTier =
+  | 'TIER_1_COMPETENT_AUTHORITY'
+  | 'TIER_2_OFFICIAL_INSTITUTION'
+  | 'TIER_3_SECONDARY_DISCOVERY';
+
+export type CurrentnessScopeKind =
+  | 'SYSTEM'
+  | 'EDUCATION_LEVEL'
+  | 'SUBJECT'
+  | 'GRADE'
+  | 'GRADE_BAND'
+  | 'STRUCTURAL_ELEMENT'
+  | 'CANONICAL_CLAIM';
+
+export interface CurrentnessScope {
+  readonly kind: CurrentnessScopeKind;
+  readonly system?: string;
+  readonly educationLevel?: string;
+  readonly subject?: string;
+  readonly grade?: string;
+  readonly gradeBand?: readonly string[];
+  readonly structuralElementId?: string;
+  readonly canonicalIdentity?: string;
+}
+
+export type TemporalPrecision = 'DAY' | 'MONTH' | 'YEAR' | 'ACADEMIC_YEAR' | 'UNKNOWN';
+export type CurrentnessRecoveryState = 'RECOVERED_AUTHENTICATED' | 'OFFICIAL_PAGE_RECORDED' | 'OFFICIAL_SOURCE_DISCOVERED_NOT_RECOVERED';
+export type CurrentnessSupportRole = 'SUPPORTING' | 'QUALIFYING' | 'CONTRADICTING' | 'DISCOVERY_ONLY';
+
+export interface SourceCurrentnessEvidenceRecord {
+  readonly evidenceId: string;
+  readonly sourceId: string;
+  readonly sourceVersionId?: string;
+  readonly evidenceClass: SourceCurrentnessEvidenceClass;
+  readonly authorityTier: CurrentnessAuthorityTier;
+  readonly issuer: string;
+  readonly documentType: string;
+  readonly publicationDate?: string;
+  readonly publicationDatePrecision: TemporalPrecision;
+  readonly targetScope: CurrentnessScope;
+  readonly relationshipToTargetSource: string;
+  readonly relationshipToTargetScope: string;
+  readonly applicabilityStatement: string;
+  readonly evidenceLocator: string;
+  readonly retrievedAt: string;
+  readonly currentnessAsOf?: string;
+  readonly supportRole: CurrentnessSupportRole;
+  readonly artifactHash?: string;
+  readonly recoveryState: CurrentnessRecoveryState;
+  readonly applicabilityStart?: string;
+  readonly applicabilityEnd?: string;
+  readonly applicabilityPrecision: TemporalPrecision;
+  readonly academicYearRange?: string;
+  readonly applicabilityBasis: string;
+}
+
+export type DerivedCurrentnessState =
+  | 'CURRENT_CONFIRMED'
+  | 'CURRENT_FOR_SCOPE'
+  | 'CURRENT_WITH_QUALIFICATIONS'
+  | 'LATEST_VERIFIED_ARTIFACT_FOUND'
+  | 'CURRENTNESS_UNRESOLVED'
+  | 'SUPERSEDED_IN_SCOPE'
+  | 'HISTORICAL_ONLY';
+
+export type CurrentnessApplicabilityState = 'APPLICABLE' | 'UNRESOLVED' | 'SUPERSEDED' | 'NOT_APPLICABLE';
+export type CurrentnessRevalidationTrigger =
+  | 'NEW_OFFICIAL_SOURCE_DISCOVERED'
+  | 'EXPLICIT_AMENDMENT_OR_REPLACEMENT'
+  | 'ACADEMIC_YEAR_BOUNDARY'
+  | 'PRE_PUBLICATION_RELEASE'
+  | 'CONTRADICTORY_AUTHORITY_EVIDENCE';
+
+export interface CurrentnessDecisionRecord {
+  readonly currentnessDecisionId: string;
+  readonly targetSourceId: string;
+  readonly targetSourceVersionId: string;
+  readonly targetScope: CurrentnessScope;
+  readonly authorityState: CanonicalSourceAuthorityState;
+  readonly currentnessState: DerivedCurrentnessState;
+  readonly applicabilityState: CurrentnessApplicabilityState;
+  readonly currentnessAsOf: string;
+  readonly supportingEvidenceIds: readonly string[];
+  readonly contradictingEvidenceIds: readonly string[];
+  readonly decisionReason: string;
+  readonly revalidationTriggers: readonly CurrentnessRevalidationTrigger[];
+}
+
+export interface DerivedCurrentnessReadiness {
+  readonly claimId: string;
+  readonly sourceVersionId: string;
+  readonly currentnessState: DerivedCurrentnessState;
+  readonly decision: PublicationReadinessState;
+  readonly decisionReason: string;
+}
