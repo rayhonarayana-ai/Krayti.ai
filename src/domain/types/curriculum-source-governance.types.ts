@@ -3043,3 +3043,133 @@ export interface DerivedCurrentnessReadiness {
   readonly decision: PublicationReadinessState;
   readonly decisionReason: string;
 }
+
+// ============================================================
+// GATE 07C.14 — IMMUTABLE PUBLICATION AND RELEASE BOUNDARY
+// ============================================================
+
+export type PublicationPolicyVersion = string;
+export type PublicationManifestStatus = 'DRAFT' | 'VALIDATED' | 'SEALED' | 'REJECTED';
+export type CurriculumReleaseStatus = 'DRAFT' | 'VALIDATED' | 'SEALED' | 'ACTIVE' | 'SUPERSEDED' | 'WITHDRAWN' | 'REJECTED';
+
+export interface PublicationReleaseScope {
+  readonly educationSystem: string;
+  readonly educationLevel?: string;
+  readonly subject?: string;
+  readonly gradeOrBand?: readonly string[];
+}
+
+export interface PublicationCandidate {
+  readonly candidateId: string;
+  readonly canonicalIdentity: string;
+  readonly claimId: string;
+  readonly sourceId: string;
+  readonly sourceVersionId: string;
+  readonly artifactHash: string;
+  readonly verificationRecordId: string;
+  readonly verificationVersion: string;
+  readonly currentnessDecisionId: string;
+  readonly currentnessAsOf: string;
+  readonly currentnessState: DerivedCurrentnessState;
+  readonly readinessDecisionId: string;
+  readonly readinessState: PublicationReadinessState;
+  readonly scope: PublicationReleaseScope;
+  readonly semanticIdentity: string;
+  readonly semanticDigest: string;
+  readonly provenanceDigest: string;
+  readonly publicationPolicyVersion: PublicationPolicyVersion;
+}
+
+export interface PublicationManifestEntry extends PublicationCandidate {
+  readonly manifestEntryId: string;
+}
+
+export interface PublicationManifest {
+  readonly manifestId: string;
+  readonly manifestVersion: string;
+  readonly createdAt: string;
+  readonly publicationPolicyVersion: PublicationPolicyVersion;
+  readonly entries: readonly PublicationManifestEntry[];
+  readonly entryCount: number;
+  readonly manifestDigest: string;
+  readonly previousManifestId?: string;
+  readonly status: PublicationManifestStatus;
+}
+
+export interface CurriculumRelease {
+  readonly releaseId: string;
+  readonly releaseVersion: string;
+  readonly releaseScope: PublicationReleaseScope;
+  readonly manifestId: string;
+  readonly manifestDigest: string;
+  readonly publicationPolicyVersion: PublicationPolicyVersion;
+  readonly createdAt: string;
+  readonly sealedAt?: string;
+  readonly activatedAt?: string;
+  readonly status: CurriculumReleaseStatus;
+  readonly previousReleaseId?: string;
+}
+
+export type PublicationWithdrawalReason =
+  | 'SOURCE_SUPERSEDED'
+  | 'CURRENTNESS_INVALIDATED'
+  | 'VERIFICATION_REOPENED'
+  | 'CLAIM_REJECTED'
+  | 'PROVENANCE_INVALIDATED'
+  | 'EDITORIAL_ERROR'
+  | 'LEGAL_OR_POLICY_BLOCK'
+  | 'DUPLICATE_CANONICAL_IDENTITY'
+  | 'OTHER_REVIEW_REQUIRED';
+
+export interface PublicationWithdrawalRecord {
+  readonly withdrawalId: string;
+  readonly targetReleaseId: string;
+  readonly targetManifestEntryIds: readonly string[];
+  readonly scope: PublicationReleaseScope;
+  readonly reasonCode: PublicationWithdrawalReason;
+  readonly reasonText?: string;
+  readonly createdAt: string;
+  readonly authorityReference: string;
+  readonly replacementReleaseId?: string;
+}
+
+export interface PublicationSupersessionRecord {
+  readonly supersessionId: string;
+  readonly predecessorReleaseId: string;
+  readonly successorReleaseId: string;
+  readonly targetCanonicalIdentities: readonly string[];
+  readonly scope: PublicationReleaseScope;
+  readonly createdAt: string;
+  readonly reason: string;
+}
+
+export type PublicationLifecycleEventType =
+  | 'MANIFEST_CREATED' | 'MANIFEST_VALIDATED' | 'RELEASE_SEALED' | 'RELEASE_ACTIVATED'
+  | 'RELEASE_SUPERSEDED' | 'ENTRY_WITHDRAWN' | 'RELEASE_WITHDRAWN' | 'VALIDATION_FAILED'
+  | 'CURRENTNESS_REOPENED' | 'VERIFICATION_REOPENED';
+
+export interface PublicationLifecycleEvent {
+  readonly eventId: string;
+  readonly eventType: PublicationLifecycleEventType;
+  readonly releaseId?: string;
+  readonly manifestId?: string;
+  readonly createdAt: string;
+  readonly authorityReference: string;
+  readonly idempotencyKey: string;
+}
+
+export interface ActivePublishedCurriculumEntry {
+  readonly publishedCurriculumId: string;
+  readonly releaseId: string;
+  readonly manifestId: string;
+  readonly manifestEntryId: string;
+  readonly canonicalIdentity: string;
+  readonly scope: PublicationReleaseScope;
+  readonly semanticIdentity: string;
+  readonly semanticDigest: string;
+  readonly sourceId: string;
+  readonly sourceVersionId: string;
+  readonly artifactHash: string;
+  readonly publicationPolicyVersion: PublicationPolicyVersion;
+  readonly effectivePublicationState: 'ACTIVE';
+}
