@@ -2804,3 +2804,128 @@ export interface ControlledContentVerificationVerdict {
   readonly denominatorFrozenVerbatim: boolean;    // true
   readonly recommendation: 'PASS' | 'PARTIAL' | 'FAIL';
 }
+
+// ============================================================
+// GATE 07C.12 — CANONICAL EFFECTIVE VERIFIED CONTENT
+// ============================================================
+
+/** Authority remains independent from source recency/currentness. */
+export type CanonicalSourceAuthorityState =
+  | 'AUTHORITATIVE_FOR_SCOPE'
+  | 'NOT_AUTHORITATIVE_FOR_SCOPE'
+  | 'AUTHORITY_UNRESOLVED';
+
+/** Conservative currentness assessment for an asserted source version. */
+export type CanonicalSourceCurrentnessState =
+  | 'CURRENT_CONFIRMED'
+  | 'LATEST_VERIFIED_ARTIFACT_FOUND'
+  | 'SUPERSEDED_IN_SCOPE'
+  | 'CURRENTNESS_UNRESOLVED';
+
+/** Effective-truth state never overwrites historical verification state. */
+export type CanonicalEffectiveTruthState =
+  | 'EFFECTIVE'
+  | 'SUPERSEDED'
+  | 'REVIEW_REQUIRED_FOR_CURRENTNESS'
+  | 'HISTORICAL_ONLY';
+
+/** Closed, additive explanation for a scoped supersession decision. */
+export type CanonicalSupersessionReason =
+  | 'SOURCE_VERSION_SUPERSESSION'
+  | 'SEMANTIC_CORRECTION'
+  | 'SCOPE_REPLACEMENT'
+  | 'DUPLICATE_CONSOLIDATION';
+
+/** Universal semantic tuple. Source version is deliberately outside this identity. */
+export interface CanonicalCurriculumIdentity {
+  readonly sourceSubject: SourceNativeSubjectCode;
+  readonly structuralElementId: string;
+  readonly category: ContentClaimCategory;
+  readonly gradeOrBandScope: readonly string[];
+  readonly normalizedSemanticValue: string;
+  readonly canonicalIdentity: string;
+}
+
+/** Additive scoped supersession; no effective date is invented when unknown. */
+export interface CanonicalClaimSupersession {
+  readonly supersessionId: string;
+  readonly canonicalIdentity: string;
+  readonly supersededSourceVersionId: string;
+  readonly supersedingSourceVersionId: string;
+  readonly reason: CanonicalSupersessionReason;
+  readonly effectiveFrom?: string;
+}
+
+/** Read-only projection over a historical claim plus its applicable verification. */
+export interface EffectiveCanonicalVerifiedClaim {
+  readonly claimId: string;
+  readonly canonicalIdentity: string;
+  readonly sourceVersionId: string;
+  readonly verificationReviewId: string;
+  readonly verificationVersion: string;
+  readonly effectiveVerificationState: 'VERIFIED';
+  readonly effectiveTruthState: CanonicalEffectiveTruthState;
+  readonly sourceAuthorityState: CanonicalSourceAuthorityState;
+  readonly sourceCurrentnessState: CanonicalSourceCurrentnessState;
+  readonly sourceSubject: SourceNativeSubjectCode;
+  readonly structuralElementId: string;
+  readonly gradeOrBandScope: readonly string[];
+  readonly physicalPage: number;
+  readonly printedPage: string;
+  readonly artifactSha256: string;
+  readonly verificationPath: VerificationExtractionPath;
+  readonly attributionAssessment: VerificationGradeAttribution;
+}
+
+/** Publication readiness is downstream from verification and never publishes. */
+export type PublicationReadinessState =
+  | 'NOT_EVALUATED'
+  | 'REVIEW_REQUIRED'
+  | 'BLOCKED'
+  | 'READY';
+
+export type PublicationReadinessAssessment =
+  | 'CONFIRMED'
+  | 'REVIEW_REQUIRED'
+  | 'BLOCKED';
+
+/** Additive readiness record; it references verified truth and never copies wording. */
+export interface PublicationReadinessRecord {
+  readonly readinessAssessmentId: string;
+  readonly claimId: string;
+  readonly canonicalIdentity: string;
+  readonly verificationReviewId: string;
+  readonly sourceVersionId: string;
+  readonly authorityAssessment: CanonicalSourceAuthorityState;
+  readonly currentnessAssessment: CanonicalSourceCurrentnessState;
+  readonly structuralParentAssessment: PublicationReadinessAssessment;
+  readonly scopeAssessment: PublicationReadinessAssessment;
+  readonly semanticSafetyAssessment: PublicationReadinessAssessment;
+  readonly provenanceAssessment: PublicationReadinessAssessment;
+  readonly contradictionAssessment: PublicationReadinessAssessment;
+  readonly dedupAssessment: PublicationReadinessAssessment;
+  readonly editorialSafetyAssessment: PublicationReadinessAssessment;
+  readonly decision: PublicationReadinessState;
+  readonly decisionReason: string;
+}
+
+/** Derived Gate-07C.12 counters. */
+export interface CanonicalEffectiveVerificationLedger {
+  readonly gate: '07C.12';
+  readonly historicalVerifiedReviewRecordCount: number;
+  readonly effectiveCanonicalVerifiedClaimCount: number;
+  readonly effectiveRejectedCount: number;
+  readonly canonicalIdentityCollisionCount: number;
+  readonly supersededExcludedCount: number;
+  readonly publishedCount: number;
+}
+
+export interface PublicationReadinessLedger {
+  readonly gate: '07C.12';
+  readonly positiveReadinessPilotCount: number;
+  readonly publicationReadyCount: number;
+  readonly publicationReviewRequiredCount: number;
+  readonly publicationBlockedCount: number;
+  readonly negativeControlExcludedCount: number;
+  readonly publishedCount: number;
+}
