@@ -2169,3 +2169,170 @@ export interface CellAttributionReviewVerdict {
   readonly sevenC7SuitePreserved: boolean;    // true (§55, 92/92)
   readonly recommendation: 'PASS' | 'PARTIAL' | 'FAIL';
 }
+
+// ============================================================
+// GATE 07C.9 — CONTROLLED MULTI-CELL CONTENT EXPANSION READINESS
+// ============================================================
+// Purpose: safely expand the trusted extraction/attribution architecture from
+// the ONE Gate-07C.7 pilot cell (P1 × SRC_MATH × el-math-numbers) to a SMALL
+// set (2-4 cells, ~10-30 claims) of additional source-native cells in the SAME
+// proven DIRECT_DIGITAL region of the authenticated 2021 primary curriculum
+// artifact — WITHOUT fabricating grade ownership, duplicating source truth,
+// weakening provenance, or creating lessons/KOs/exercises (§1/§5).
+//
+// FROZEN BOUNDARY (additive only): the 07C.7 pilot registry (16 claims) and
+// 07C.8 review registry (6 records) are NOT mutated. This gate is a NEW,
+// separate expansion layer. CONTENT_VERIFIED stays 0, PUBLISHED stays 0,
+// masteryDerived stays false, completeness stays UNMEASURABLE (§3/§32).
+//
+// GRADE ATTRIBUTION (§10/§11): reuses the 07C.8 epistemic distinction. The
+// pilot/candidate cell is declared by its candidate grade; the ACTUAL grade the
+// source geometry establishes is recorded separately. Grade is NEVER inferred
+// from sourceTopic, claimId, normalized wording, or curriculum plausibility.
+// Cell attribution modes (closed):
+//   DIRECTLY_ESTABLISHED_GRADE         -> an explicit per-row grade header
+//                                         directly governs the cell.
+//   STRUCTURALLY_CALIBRATED_GRADE      -> exact grade derived by deterministic
+//                                         cross-page calibration from an anchor.
+//   REVIEW_REQUIRED                    -> exact grade NOT deterministically
+//                                         established; kept as a review candidate.
+//   SOURCE_STRUCTURE_INSUFFICIENT      -> the source structure cannot establish
+//                                         a grade (retained, non-masquerading).
+
+/** Closed cell-attribution mode for an expansion cell (§11). */
+export type ExpansionCellAttributionMode =
+  | 'DIRECTLY_ESTABLISHED_GRADE'
+  | 'STRUCTURALLY_CALIBRATED_GRADE'
+  | 'REVIEW_REQUIRED'
+  | 'SOURCE_STRUCTURE_INSUFFICIENT';
+
+/** Digital/OCR state of the expansion cell's matrix page (§16). */
+export type ExpansionDigitalState = 'DIRECT_DIGITAL' | 'DIGITAL_WITH_OCR_RECOVERY' | 'OCR_EXTRACTED';
+
+/** Geometry-safety state of the expansion cell's grid association. */
+export type ExpansionGeometryState =
+  | 'GEOMETRY_CONFIRMED'     // cell/grade association confirmed from clean geometry
+  | 'GEOMETRY_AMBIGUOUS'     // association not fully resolvable from geometry
+  | 'GEOMETRY_INSUFFICIENT'; // source structure cannot resolve the association
+
+/** A single source-native expansion cell (the §22 additive boundary unit). */
+export interface ControlledContentExpansionCell {
+  readonly cellId: string;                  // stable expansion cell identity
+  readonly gate: '07C.9';
+  readonly sourceTopic: GateSourceTopic;    // NUMBERS / ADD_SUB / MULT / DIV
+  readonly candidateGrade: CellSourceConfirmedGrade; // declared candidate grade
+  readonly physicalPage: number;            // physical page (index+1)
+  readonly scannedIndex: number;            // pdfjs/scan basis
+  readonly printedPage: string;             // printed footer page
+  readonly structuralElementId: string;     // el-math-numbers (source-native)
+  readonly sourceSubject: SourceNativeSubjectCode; // SRC_MATH
+  readonly applicationSubjectCode: ApplicationSubjectCode; // downstream (§19)
+  readonly cellLabelAr: string;             // short non-content cell label
+  readonly digitalState: ExpansionDigitalState;
+  readonly geometryState: ExpansionGeometryState;
+  readonly attributionMode: ExpansionCellAttributionMode;
+  readonly exactGradeEvidenceState: ExactGradeEvidenceState; // epistemic level (§10)
+  readonly notes: string;
+}
+
+/** A Gate-07C.9 expansion content claim (additive; does NOT touch the pilot). */
+export interface ExpansionContentClaim {
+  readonly claimId: string;                 // stable content-claim identity
+  readonly cellId: string;                  // -> ControlledContentExpansionCell.cellId
+  readonly category: ContentClaimCategory;
+  readonly sourceTopic: GateSourceTopic;
+  readonly educationSystemCode: string;     // MOROCCO
+  readonly stageCode: string;               // PRIMARY
+  readonly candidateGrade: CellSourceConfirmedGrade; // declared candidate scope
+  readonly sourceConfirmedGrade: CellSourceConfirmedGrade | null; // only when DIRECTLY_ESTABLISHED
+  readonly structuralElementId: string;     // -> el-math-numbers
+  readonly sourceSubject: SourceNativeSubjectCode; // SRC_MATH
+  readonly applicationSubjectCode: ApplicationSubjectCode;
+  readonly sourceVersionId: string;         // v1.0.0
+  readonly sourceClassification: SourceClassification; // OFFICIAL_CURRICULUM_DOCUMENT
+
+  readonly sourceWordingAr: string;         // minimal short wording only (§26)
+  readonly normalizedValueAr: string;
+  readonly normalizationClassification: NormalizationClassification;
+  readonly extractionMethod: ExtractionMethod;
+  readonly provenance: SourceContentClaimProvenance;
+
+  readonly attributionMode: ExpansionCellAttributionMode; // grade-cell attribution (§11)
+  readonly verificationState: VerificationState; // UNVERIFIED / REVIEW_REQUIRED / REJECTED
+  readonly contentStatus: ExtractionContentStatus; // EXTRACTED_UNVERIFIED / REVIEW_REQUIRED
+  readonly confidence: 'HIGH' | 'MODERATE' | 'LOW' | 'UNVERIFIED';
+  readonly notes?: string;
+}
+
+/** Expansion scope declaration (declared BEFORE extraction, §9/§22). */
+export interface ControlledContentExpansionDeclaration {
+  readonly gate: '07C.9';
+  readonly expansionId: string;
+  readonly sourceSubject: 'SRC_MATH';
+  readonly structuralElementId: 'el-math-numbers';
+  readonly extractionMethod: 'DIRECT_STRUCTURED_EXTRACTION';
+  readonly extractionClass: 'DIRECT_DIGITAL';
+  readonly physicalPageRange: string;
+  readonly printedPageRange: string;
+  readonly scannedIndexRange: string;
+  readonly cellCount: number;
+  readonly expectedClaimCategories: readonly ContentClaimCategory[];
+  readonly why: string;
+  readonly ocrState: string;
+}
+
+/** Gate-07C.9 expansion ledger — safety counters (§22/§47). */
+export interface ControlledContentExpansionLedger {
+  readonly gate: '07C.9';
+  readonly expansionId: string;
+  readonly cells: readonly ControlledContentExpansionCell[];
+  readonly cellCount: number;
+  readonly claims: readonly ExpansionContentClaim[];
+  readonly claimCount: number;
+  // Attribution-mode counts (derived from the expansion claims).
+  readonly directlyEstablishedGradeCount: number;
+  readonly structurallyCalibratedGradeCount: number;
+  readonly reviewRequiredGradeCount: number;
+  readonly sourceStructureInsufficientGradeCount: number;
+  // State counts.
+  readonly extractedUnverifiedCount: number;
+  readonly reviewRequiredContentCount: number;
+  // FROZEN safety counters (§3/§32).
+  readonly contentVerifiedCount: number;    // MUST stay 0
+  readonly publishedCount: number;          // MUST stay 0
+  readonly directSourceConfirmedCount: number; // MUST stay 0 unless proven directly
+  readonly contentDenominatorKnown: boolean; // false => completeness UNMEASURABLE
+  readonly completenessStatus: 'MEASURABLE' | 'UNMEASURABLE';
+  readonly syntheticLessons: number;        // MUST stay 0
+  readonly syntheticKnowledgeObjects: number; // MUST stay 0
+  readonly syntheticExercises: number;      // MUST stay 0
+  // Distinctness markers (diversity, §6).
+  readonly distinctCandidateGrades: readonly CellSourceConfirmedGrade[];
+  readonly distinctSourceTopics: readonly GateSourceTopic[];
+}
+
+/** Overall Gate 07C.9 verdict. */
+export interface ControlledContentExpansionVerdict {
+  readonly gate: '07C.9';
+  readonly expansionId: string;
+  readonly artifactSha256: string;
+  readonly sourceVersionId: string;
+  readonly cellCount: number;
+  readonly claimCount: number;
+  readonly contentVerified: number;         // 0
+  readonly published: number;               // 0
+  readonly structureCompleteVerified: number; // 0
+  readonly masteryDerived: boolean;         // false
+  readonly contentDenominatorKnown: boolean; // false
+  readonly completenessUnmeasurable: boolean; // true
+  readonly sourceNativeFirst: boolean;      // true
+  readonly applicationMappingIsSecondary: boolean; // true
+  readonly noSyntheticUnitsLessonsKOsOrExercises: boolean; // true
+  readonly noFabricatedGradeOwnership: boolean; // true
+  readonly noSourceTruthDuplication: boolean; // true
+  readonly diversitySatisfied: boolean;     // true (≥2 of grade/subject/structure/category, §6)
+  readonly pilotRegistryFrozen: boolean;    // true (07C.7 16 claims untouched)
+  readonly reviewRegistryFrozen: boolean;   // true (07C.8 6 records untouched)
+  readonly denominatorFrozenVerbatim: boolean; // true (structural denominator preserved)
+  readonly recommendation: 'PASS' | 'PARTIAL' | 'FAIL';
+}
