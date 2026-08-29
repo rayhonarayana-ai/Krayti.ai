@@ -1993,3 +1993,179 @@ export interface ControlledContentExtractionVerdict {
   readonly denominatorFrozenVerbatim: boolean; // 42/0/3/6/3 preserved (§2)
   readonly recommendation: 'PASS' | 'PARTIAL' | 'FAIL';
 }
+
+// ============================================================
+// GATE 07C.8 — PRIMARY CURRICULUM CELL ATTRIBUTION & REVIEW RESOLUTION
+// ============================================================
+// Purpose: resolve the six Gate-07C.7 REVIEW_REQUIRED cell-attribution claims
+// (3 MULTIPLICATION + 3 DIVISION) from the PRIMARY ARTIFACT'S TABLE GEOMETRY
+// ONLY. Grade truth comes from table headings/ranges/row alignment, NOT from
+// semantic plausibility, claimId, wording, application taxonomy, or curriculum
+// knowledge (§13 forensic core).
+//
+// The pilot claims array (Gate 07C.7) is NOT mutated here. Gate 07C.8 is an
+// ADDITIVE review layer: it records a resolved attribution decision for each
+// such review claim while preserving the 07C.7 freeze (§1/§55: 07C.7 stays
+// 92/92, REVIEW=6/REJECTED=0, claim count 16, §23).
+//
+// GRADE-SCOPE DISTINCTION (§16): `gradeCode` on the pilot claim is the PILOT
+// CANDIDATE SCOPE (P1). `sourceConfirmedGrade` here records what the source
+// geometry ACTUALLY establishes (which may be another grade). These remain
+// explicitly distinct and are NEVER conflated.
+
+// Closed attribution decision model (§15).
+export type ContentCellAttributionDecision =
+  | 'CONFIRMED_P1'
+  | 'CONFIRMED_OTHER_GRADE'
+  | 'STILL_AMBIGUOUS'
+  | 'SOURCE_STRUCTURE_INSUFFICIENT'
+  | 'REJECTED_AS_P1';
+
+// Closed decision bases (§39). NO arbitrary numeric confidence is used.
+export type AttributionDecisionBasis =
+  | 'DIRECT_CELL_HEADER_ALIGNMENT'
+  | 'MERGED_CELL_GRADE_SPAN'
+  | 'TABLE_ROW_COLUMN_ALIGNMENT'
+  | 'CONTINUATION_FROM_LABELED_HEADER'
+  | 'VISUAL_BOUNDARY_CONFIRMATION'
+  | 'DIGITAL_GEOMETRY_CONFIRMATION'
+  | 'OCR_ASSISTED_GEOMETRY_REVIEW'
+  | 'SOURCE_STRUCTURE_INSUFFICIENT';
+
+// Closed review-state for a resolved attribution review.
+export type CellAttributionReviewState = 'RESOLVED';
+
+// Closed primary-grade scope shared by the review semantic fields.
+export type CellSourceConfirmedGrade = 'P1' | 'P2' | 'P3' | 'P4' | 'P5' | 'P6';
+
+// P1 OWNERSHIP RESULT — a NEGATIVE attribution question (§2-A/§6):
+// whether the source geometry establishes that the claim is NOT owned by the
+// P1 cell/band. This is SEPARATE from any positive exact-grade claim (§2).
+//   CONFIRMED_FALSE   -> geometry establishes the claim is NOT P1.
+//   NOT_PROVEN_FALSE  -> NOT-P1 is NOT yet established as a fact.
+export type CellP1OwnershipState = 'CONFIRMED_FALSE' | 'NOT_PROVEN_FALSE';
+
+// EXACT-GRADE EVIDENCE STATE (§3/§13) — closed epistemic level of any positive
+// exact grade (P3/P4) attribution, distinct from the negative NOT-P1 result:
+//   DIRECTLY_ESTABLISHED      -> an explicit per-row grade header directly
+//                                governs the cell (artifact-printed grade).
+//   STRUCTURALLY_CALIBRATED   -> exact grade derived by deterministic cross-page
+//                                structural calibration from an explicit anchor
+//                                grade (NOT semantic plausibility).
+//   UNRESOLVED                -> no deterministic exact grade can be established.
+// NO numeric confidence is used.
+export type ExactGradeEvidenceState = 'DIRECTLY_ESTABLISHED' | 'STRUCTURALLY_CALIBRATED' | 'UNRESOLVED';
+
+// Cross-page calibration contract evidence (§7). Present only when
+// exactGradeEvidenceState === 'STRUCTURALLY_CALIBRATED'. Each requirement is
+// surfaced as an explicit, machine-readable field so the calibration is
+// auditable and never rests on curriculum plausibility.
+export interface CrossPageCalibrationEvidence {
+  readonly anchorGrade: CellSourceConfirmedGrade; // explicit anchor grade in the structure
+  readonly anchorLocator: string;      // where the anchor grade is printed (e.g. P1 bottom band)
+  readonly tableContinuityNote: string; // same source-native table / demonstrable continuity
+  readonly bandOrderingStableNote: string; // stable row/band ordering
+  readonly deterministicOffsetNote: string; // deterministic positional offset
+  readonly noContradictoryBoundaryNote: string; // no contradictory header/boundary found
+}
+
+// Geometry evidence (short locator notes only — §26 copyright). NO page dumps,
+// OCR dumps, or transcribed tables. Only minimal coordinates/labels.
+export interface CellAttributionGeometryEvidence {
+  readonly elementLabel: string;      // e.g. "مصفوفة المدى والتتابع — مجال الأعداد والحساب"
+  readonly headerOrRangeNote: string; // short note, e.g. "range 'من 0 إلى 9999' present"
+  readonly rowColumnAlignmentNote: string; // short row/band alignment note
+  readonly continuationNote?: string; // only when a labelled header continuation is used
+  readonly crossPageCalibration?: CrossPageCalibrationEvidence; // only when STRUCTURALLY_CALIBRATED
+}
+
+// A single resolved cell-attribution review record (§14 fields + exact-grade
+// epistemic reconciliation).
+export interface CellAttributionReview {
+  readonly reviewId: string;
+  readonly claimId: string;              // references the 07C.7 pilot claim (stable, E02)
+  readonly sourceTopic: GateSourceTopic;
+  readonly artifactId: string;
+  readonly sourceVersionId: string;
+  readonly physicalPage: number;
+  readonly printedPage: string;
+  readonly structuralElementId: string;  // el-math-numbers (source-native)
+  readonly candidateGrade: 'P1';         // pilot candidate scope (the registry is P1-scoped)
+  readonly p1Ownership: CellP1OwnershipState; // NEGATIVE attribution result (§2-A/§6)
+  readonly exactGradeCandidate: 'P3' | 'P4' | 'UNKNOWN'; // positive exact-grade candidate (§6)
+  readonly exactGradeEvidenceState: ExactGradeEvidenceState; // closed epistemic level (§3)
+  // `sourceConfirmedGrade` is populated ONLY when the artifact DIRECTLY
+  // establishes the exact grade (exactGradeEvidenceState === 'DIRECTLY_ESTABLISHED').
+  // It is `null` for STRUCTURALLY_CALIBRATED / UNRESOLVED so the field name never
+  // overstates the evidence (§4: source-confirmed must mean source-confirmed).
+  readonly sourceConfirmedGrade: CellSourceConfirmedGrade | null;
+  // The exact grade carried WITHOUT the "directly source-confirmed" claim, used
+  // whenever exactGradeEvidenceState === 'STRUCTURALLY_CALIBRATED' (§4).
+  readonly structurallyCalibratedGrade: CellSourceConfirmedGrade | null;
+  readonly tableLocator: string;
+  readonly cellLocator: string;
+  readonly gradeHeaderLocator: string;
+  readonly geometryEvidence: CellAttributionGeometryEvidence;
+  readonly attributionDecision: ContentCellAttributionDecision;
+  readonly decisionBasis: readonly AttributionDecisionBasis[];
+  readonly reviewState: CellAttributionReviewState;
+  readonly reviewRequirement: 'REVIEW_REQUIRED'; // mirrors the pilot claim it resolves
+  readonly reviewedAt: string;           // static review date (ISO)
+  readonly reviewMethod: 'DIRECT_DIGITAL' | 'DIGITAL_WITH_OCR_RECOVERY';
+}
+
+// Additive Gate 07C.8 ledger: counts derived from the review records so the
+// report and the registry can never diverge. Pilot claim state is untouched.
+//
+// NOT-P1 (negative attribution) and EXACT-GRADE (positive attribution) are kept
+// as distinct count dimensions (§12): `confirmedNotP1Count` answers "is it NOT
+// P1?"; the exact-grade evidence counts answer "how is a specific other grade
+// (P3/P4) established?".
+export interface CellAttributionReviewLedger {
+  readonly gate: '07C.8';
+  readonly reviewRequestCount: number;        // 6 (one per 07C.7 REVIEW_REQUIRED claim)
+  readonly resolvedReviewCount: number;       // == reviewed records
+  // Negative attribution (P1 ownership) — §2-A/§6.
+  readonly confirmedNotP1Count: number;       // reviews with p1Ownership === CONFIRMED_FALSE
+  readonly notProvenNotP1Count: number;       // reviews with p1Ownership === NOT_PROVEN_FALSE
+  // Decision model (§15).
+  readonly confirmedP1Count: number;          // 0
+  readonly confirmedOtherGradeCount: number;  // 6 (== confirmedNotP1Count here)
+  readonly stillAmbiguousCount: number;       // 0
+  readonly sourceStructureInsufficientCount: number; // 0
+  readonly rejectedAsP1Count: number;         // 0
+  // Positive exact-grade evidence level (derived from exactGradeEvidenceState).
+  readonly directlyEstablishedGradeCount: number;    // 0
+  readonly structurallyCalibratedGradeCount: number; // 6
+  readonly unresolvedExactGradeCount: number;        // 0
+  // Directly source-confirmed exact grades (only non-null sourceConfirmedGrade).
+  readonly distinctSourceConfirmedGrades: readonly CellSourceConfirmedGrade[];
+  // Calibrated exact grades (only non-null structurallyCalibratedGrade).
+  readonly distinctStructurallyCalibratedGrades: readonly CellSourceConfirmedGrade[];
+  readonly sourceTopicsReviewed: readonly GateSourceTopic[];
+  readonly frozenPilotReviewCount: number;    // 6 (freeze surface, §55)
+}
+
+// Overall Gate 07C.8 verdict.
+export interface CellAttributionReviewVerdict {
+  readonly gate: '07C.8';
+  readonly pilotId: string;
+  readonly artifactSha256: string;
+  readonly sourceVersionId: string;
+  readonly reviewRequestCount: number;        // 6
+  readonly resolvedReviewCount: number;       // 6
+  readonly confirmedP1Count: number;          // 0
+  readonly confirmedOtherGradeCount: number;  // 6
+  readonly confirmedNotP1Count: number;       // 6 (negative attribution, §12)
+  readonly directlyEstablishedGradeCount: number;    // 0
+  readonly structurallyCalibratedGradeCount: number; // 6
+  readonly unresolvedExactGradeCount: number;        // 0
+  readonly claimsMasqueradingAsP1: boolean;   // false
+  readonly sourceConfirmedOnlyDirect: boolean;// true (sourceConfirmedGrade null unless directly established)
+  readonly pilotClaimCountFrozen: boolean;    // true (16, §23)
+  readonly contentVerifiedStaysZero: boolean; // true (§3/§22/§43)
+  readonly publishedStaysZero: boolean;       // true (§3)
+  readonly gradeScopeDistinct: boolean;       // true (§16 candidate vs source grade)
+  readonly sevenC7SuitePreserved: boolean;    // true (§55, 92/92)
+  readonly recommendation: 'PASS' | 'PARTIAL' | 'FAIL';
+}
