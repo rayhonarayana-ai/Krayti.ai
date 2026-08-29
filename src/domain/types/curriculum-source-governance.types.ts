@@ -2603,3 +2603,204 @@ export interface ControlledBatchExtractionVerdict {
   readonly denominatorFrozenVerbatim: boolean; // true (global freezes preserved)
   readonly recommendation: 'PASS' | 'PARTIAL' | 'FAIL';
 }
+
+// ============================================================
+// GATE 07C.11 — CONTROLLED CURRICULUM CONTENT VERIFICATION
+// ============================================================
+// Purpose: prove a controlled VERIFICATION protocol over the frozen 6-claim
+// pilot (clm-p1-math-numbers-natural-numbers-0-9, clm-p1-math-numbers-add-concept,
+// clm-p2-math-numbers-add-999, cl-aA-math-p3-add-9999,
+// cl-bA-fr-write-p23-ecriture-cursive, clm-p1-math-numbers-multiply-repeated-addition).
+// The verification layer is ADDITIVE: the 07C.7 pilot registry (16 claims), the
+// 07C.8 review registry (6 records), the 07C.9 expansion registry (3 cells), and
+// the 07C.10 batch registry (2 batches / 11 claims) are NOT mutated. Effective
+// verification state is DERIVED from the canonical claim + its additive
+// verification record.
+//
+// VERIFICATION DECISIONS (§protocol):
+//   VERIFIED          -> every evidence dimension satisfies the verification
+//                        contract AND the review mode is satisfied (SINGLE_REVIEW
+//                        only when all single-review criteria pass;
+//                        DUAL_CONFIRMATION otherwise).
+//   REVIEW_REQUIRED   -> evidence is not conclusive; retained for review.
+//   REJECTED          -> a closed rejection reason applies (see
+//                        VerificationRejectionReason); the claim is not
+//                        curriculum truth as extracted.
+//
+// STATE MACHINE (§protocol): UNVERIFIED -> REVIEW_REQUIRED / VERIFIED / REJECTED;
+// REVIEW_REQUIRED -> REVIEW_REQUIRED / VERIFIED / REJECTED; REJECTED ->
+// REVIEW_REQUIRED only with NEW evidence. VERIFIED is IMMUTABLE within the
+// artifact/source version. No silent VERIFIED -> REJECTED transition.
+//
+// PATHS (§protocol): only DIRECT_PRIMARY_DIGITAL and
+// DIRECT_PRIMARY_DIGITAL_WITH_GEOMETRY_ATTRIBUTION can VERIFY.
+// CROSS_REFERENCE_SUPPORTED_BUT_NOT_VERIFIED NEVER yields VERIFIED. The OCR
+// verification path is NOT implemented in 07C.11 (FUTURE_OCR_VERIFICATION_PATH_REQUIRED);
+// no claim is VERIFIED from OCR-derived evidence.
+//
+// Persistence is NOT implemented in 07C.11 (FUTURE_PERSISTENCE_REQUIREMENT); the
+// records live in the additive registry only.
+
+/** Closed verification extraction path (§protocol). */
+export type VerificationExtractionPath =
+  | 'DIRECT_PRIMARY_DIGITAL'                            // cleanly-digital primary text directly supports the claim in place
+  | 'DIRECT_PRIMARY_DIGITAL_WITH_GEOMETRY_ATTRIBUTION'  // direct digital text + table geometry attribution
+  | 'CROSS_REFERENCE_SUPPORTED_BUT_NOT_VERIFIED';       // cross-reference support ONLY — NEVER yields VERIFIED
+
+/** Source-text fidelity of the evidence (§D fidelity). */
+export type VerificationSourceTextFidelity = 'CONFIRMED' | 'PARTIAL' | 'FAIL';
+
+/** Semantic (claim-vs-source) fidelity (§D). OVERSTATED/CONFLICT forbid VERIFIED. */
+export type VerificationSemanticFidelity = 'CONFIRMED' | 'OVERSTATED' | 'CONFLICT';
+
+/** Grade attribution assessment (§E). UNRESOLVED forbids VERIFIED. */
+export type VerificationGradeAttribution =
+  | 'DIRECT_EXACT'
+  | 'STRUCTURALLY_CALIBRATED'
+  | 'BAND_SUPPORTED'
+  | 'UNRESOLVED';
+
+/** Structural-parent association assessment. */
+export type VerificationStructuralParentAssessment =
+  | 'PARENT_CONFIRMED'
+  | 'PARENT_MISMATCH'
+  | 'PARENT_UNRESOLVED';
+
+/** Contradiction assessment (§L). FLAGGED forbids VERIFIED. */
+export type VerificationContradictionAssessment = 'CLEAR' | 'FLAGGED';
+
+/** Dedup assessment (§M). Non-CLEAR forbids VERIFIED until a collision is resolved. */
+export type VerificationDedupAssessment =
+  | 'CLEAR'
+  | 'COLLISION_RESOLVED'
+  | 'COLLISION_UNRESOLVED';
+
+/** Closed review modes (§F). */
+export type VerificationReviewMode = 'SINGLE_REVIEW' | 'DUAL_CONFIRMATION';
+
+/** Non-PII reviewer slots (never a human name/identity). */
+export type VerificationReviewerSlot = 'REVIEWER_A' | 'REVIEWER_B';
+
+/** Result of one verification review record (§protocol). */
+export type VerificationDecision = 'VERIFIED' | 'REVIEW_REQUIRED' | 'REJECTED';
+
+/** Closed rejection reasons (§K). Free-form notes NEVER replace the reason. */
+export type VerificationRejectionReason =
+  | 'SOURCE_TEXT_DOES_NOT_SUPPORT_CLAIM'
+  | 'GRADE_ATTRIBUTION_UNRESOLVED'
+  | 'CLAIM_SCOPE_REFUTED_BY_ATTRIBUTION_EVIDENCE'
+  | 'STRUCTURAL_PARENT_MISMATCH'
+  | 'SEMANTIC_OVERSTATEMENT'
+  | 'DUPLICATE_CANONICAL_TRUTH'
+  | 'SOURCE_CONTRADICTION'
+  | 'INSUFFICIENT_TEXT_FIDELITY'
+  | 'OCR_QUALITY_INSUFFICIENT'
+  | 'OUT_OF_SCOPE'
+  | 'SUPERSEDED_SOURCE_VERSION';
+
+/** Evidence package binding a review record to its canonical claim + source. */
+export interface ContentVerificationEvidencePackage {
+  readonly verificationReviewId: string;
+  readonly claimId: string;
+  readonly artifactSha256: string;
+  readonly sourceVersionId: string;
+  readonly physicalPage: number;
+  readonly printedPage: string;
+  readonly structuralElementId: string;
+  /** Stable canonical content identity (dedup key, §M). */
+  readonly semanticIdentity: string;
+  /** Human-readable stable key of the semantic identity. */
+  readonly stableKey: string;
+  readonly extractionMethod: ExtractionMethod;
+  readonly extractionPath: VerificationExtractionPath;
+  readonly sourceTextEvidence: VerificationSourceTextFidelity;
+  readonly normalizationAssessment: NormalizationClassification;
+  readonly gradeAttributionAssessment: VerificationGradeAttribution;
+  readonly structuralParentAssessment: VerificationStructuralParentAssessment;
+  readonly semanticFidelityAssessment: VerificationSemanticFidelity;
+  readonly contradictionAssessment: VerificationContradictionAssessment;
+  readonly dedupAssessment: VerificationDedupAssessment;
+  readonly reviewMode: VerificationReviewMode;
+  readonly reviewDecision: VerificationDecision;
+  readonly decisionReason: string;
+  readonly reviewedAt: string;               // static ISO review date
+  readonly verificationVersion: string;      // logical verification-layer version (v1.0.0)
+}
+
+/** Reviewer confirmations (non-PII slots only, §F). */
+export interface VerificationReviewerConfirmation {
+  readonly reviewer: VerificationReviewerSlot;
+  readonly confirmedAt: string;              // static ISO date
+}
+
+/** Additive Gate-07C.11 verification review record (never a claim body). */
+export interface ContentVerificationReviewRecord {
+  readonly reviewRecordId: string;
+  /** Declared candidate scope from the frozen claim — NEVER rewritten. */
+  readonly candidateGrade: CellSourceConfirmedGrade | null;
+  /** Artifact scope: ['P1'] / ['P2'] / ['P3'] (exact) or honest band (['P2','P3']). */
+  readonly gradeBandScope: readonly string[];
+  readonly sourceSubject: SourceNativeSubjectCode;
+  readonly applicationSubjectCode: ApplicationSubjectCode;
+  readonly normalizedValueAr?: string;
+  readonly normalizedValueFr?: string;
+  /** Present ONLY when reviewDecision === 'REJECTED'. */
+  readonly rejectionReason?: VerificationRejectionReason;
+  /** true when the record carries a FUTURE_OCR_VERIFICATION_PATH_REQUIRED note. */
+  readonly futureOcrVerificationPathRequired: boolean;
+  readonly reviewerConfirmations: readonly VerificationReviewerConfirmation[];
+  readonly reviewNotes?: string;
+  readonly evidence: ContentVerificationEvidencePackage;
+}
+
+/** Gate-07C.11 verification ledger — every count DERIVED from the records. */
+export interface ContentVerificationLedger {
+  readonly gate: '07C.11';
+  readonly pilotClaimCount: number;                       // 6 (frozen pilot)
+  readonly reviewRecordCount: number;                     // == records
+  readonly verifiedClaimCount: number;
+  readonly reviewRequiredClaimCount: number;
+  readonly rejectedClaimCount: number;
+  readonly singleReviewCount: number;
+  readonly dualConfirmationCount: number;
+  readonly claimsByExtractionPath: readonly { extractionPath: VerificationExtractionPath; count: number }[];
+  readonly claimsBySourceSubject: readonly { sourceSubject: SourceNativeSubjectCode; count: number }[];
+  readonly claimsByGradeAttribution: readonly { gradeAttributionAssessment: VerificationGradeAttribution; count: number }[];
+  readonly claimsByDecisionReason: readonly { decisionReason: string; count: number }[];
+  readonly contradictionFlaggedCount: number;
+  readonly dedupCollisionCount: number;
+  readonly ocrVerifiedCount: number;                      // MUST stay 0
+  readonly publishedCount: number;                        // MUST stay 0
+  readonly contentVerifiedCount: number;                  // DERIVED (== verifiedClaimCount)
+}
+
+/** Overall Gate 07C.11 verdict. */
+export interface ControlledContentVerificationVerdict {
+  readonly gate: '07C.11';
+  readonly artifactSha256: string;
+  readonly sourceVersionId: string;
+  readonly pilotClaimCount: number;               // 6
+  readonly reviewRecordCount: number;             // 6
+  readonly contentVerified: number;               // DERIVED (count of genuinely VERIFIED pilot claims)
+  readonly published: number;                     // 0
+  readonly structureCompleteVerified: number;     // 0
+  readonly masteryDerived: boolean;               // false
+  readonly contentDenominatorKnown: boolean;      // false
+  readonly completenessUnmeasurable: boolean;     // true
+  readonly sourceNativeFirst: boolean;            // true
+  readonly applicationMappingIsSecondary: boolean; // true
+  readonly noSyntheticUnitsLessonsKOsOrExercises: boolean; // true
+  readonly noFabricatedGradeOwnership: boolean;   // true
+  readonly noSourceTruthDuplication: boolean;     // true
+  readonly noOcrVerifiedClaims: boolean;          // true (OCR path not implemented in 07C.11)
+  readonly ocrPathNote: string;                   // FUTURE_OCR_VERIFICATION_PATH_REQUIRED
+  readonly persistenceRequirementNote: string;    // FUTURE_PERSISTENCE_REQUIREMENT
+  readonly verifiedClaimsImmutableWithinVersion: boolean; // true (VERIFIED immutable)
+  readonly pilotRegistryFrozen: boolean;          // true (07C.7 16 claims untouched)
+  readonly reviewRegistryFrozen: boolean;         // true (07C.8 6 records untouched)
+  readonly expansionRegistryFrozen: boolean;      // true (07C.9 3 cells untouched)
+  readonly batchRegistryFrozen: boolean;          // true (07C.10 2 batches untouched)
+  readonly historicalClaimsUnmutated: boolean;    // true
+  readonly denominatorFrozenVerbatim: boolean;    // true
+  readonly recommendation: 'PASS' | 'PARTIAL' | 'FAIL';
+}
