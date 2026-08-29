@@ -2336,3 +2336,270 @@ export interface ControlledContentExpansionVerdict {
   readonly denominatorFrozenVerbatim: boolean; // true (structural denominator preserved)
   readonly recommendation: 'PASS' | 'PARTIAL' | 'FAIL';
 }
+
+// ============================================================
+// GATE 07C.10 — CONTROLLED BATCH EXTRACTION PROTOCOL
+// ============================================================
+// Purpose: prove that the trusted 07C.7/07C.8/07C.9 architecture generalizes
+// to CONTROLLED BATCHES — frozen, bounded, additively-frozen extractions with
+// a full lifecycle, per-batch manifests, claim->cell binding, cross-batch and
+// cross-gate dedup, derived ledgers, and honest closure semantics.
+//
+// Phase A (CLOSED/PASS) declared and froze exactly TWO batches:
+//   Batch A  BATCH-A-07C10-MATH-P3-NUMBERS        (SRC_MATH, 3 add/sub cells,
+//                                  band 0-9999, phys 333, printed 335)
+//   Batch B  BATCH-B-07C10-FR-LECTURE-ECRITURE    (SRC_FRENCH, 2 cells,
+//                                  reading+writing, phys 219-221, printed 221-223)
+//
+// FROZEN BOUNDARY (additive only): the 07C.7 pilot registry (16 claims), the
+// 07C.8 review registry (6 records), and the 07C.9 expansion registry (3 cells
+// / claims) are NOT mutated. This gate is a NEW, separate batch layer.
+// CONTENT_VERIFIED stays 0, PUBLISHED stays 0, mastery stays NOT_DERIVED,
+// completeness stays UNMEASURABLE — globally and per batch.
+//
+// BATCH LIFECYCLE (closed): CANDIDATE -> SCOPE_FROZEN -> EXTRACTED ->
+// ATTRIBUTION_REVIEWED -> DEDUP_CHECKED -> BATCH_CLOSED. A negative candidate
+// (deferred/excluded/rejected) is BLOCKED / REVIEW_REQUIRED / REJECTED and
+// MUST NEVER become a content claim.
+//
+// GRADE ATTRIBUTION (§Phase B protocol): reuses the 07C.8/07C.9 epistemic
+// distinction. Batch A stays STRUCTURALLY_CALIBRATED (deterministic cross-page
+// calibration from the accepted P2 0-999 band one step below 0-9999). Batch B
+// (French) keeps grade-band context (P1-3 / P2-3 / P4-6) REVIEW_REQUIRED and is
+// NEVER promoted to a fabricated single exact grade. Cell attribution and child
+// claim attribution are independent evidence layers — no silent propagation.
+//
+// DEDUP (§Phase B protocol): canonical semantic comparison within each batch,
+// A<->B, and against 07C.7 + 07C.9 canonical claims. Page/claimId/batch/grade/
+// subject differences alone are NOT dedup identity. Prevented duplicates MUST
+// be recorded machine-readably and MUST NOT create a second canonical claim.
+//
+// LEDGERS (§Phase B protocol): per-batch and global ledgers are DERIVED from
+// the canonical records (no hardcoded totals). BATCH_CLOSED != VERIFIED !=
+// PUBLISHED; a batch may close while carrying REVIEW_REQUIRED claims.
+//
+// Copyright (§26): only minimal short wording + coordinates + locator notes are
+// committed. NO page dumps, OCR dumps, or transcribed tables.
+
+/** Closed batch source subject (only the two frozen batches are admitted). */
+export type BatchSourceSubject = 'SRC_MATH' | 'SRC_FRENCH';
+
+/** Closed batch lifecycle state (§Phase B protocol). */
+export type BatchLifecycleState =
+  | 'CANDIDATE'
+  | 'SCOPE_FROZEN'
+  | 'EXTRACTED'
+  | 'ATTRIBUTION_REVIEWED'
+  | 'DEDUP_CHECKED'
+  | 'BATCH_CLOSED';
+
+/** Closed negative-candidate state — never becomes a content claim. */
+export type BatchNegativeState = 'BLOCKED' | 'REVIEW_REQUIRED' | 'REJECTED';
+
+/** A single controlled batch cell (§ additively-bounded cell unit). */
+export interface ControlledBatchCell {
+  readonly cellId: string;
+  readonly batchId: string;
+  readonly gate: '07C.10';
+  /** Math: NUMBERS / ADD_SUB / MULT / DIV. French: null (no matrix topic). */
+  readonly sourceTopic: GateSourceTopic | null;
+  /** DECLARED candidate grade; null when the artifact only establishes a band. */
+  readonly candidateGrade: CellSourceConfirmedGrade | null;
+  /** Artifact scope: single grade (['P3']) or honest grade band (['P1','P2','P3']). */
+  readonly gradeBandScope: readonly string[];
+  readonly physicalPage: number;
+  readonly scannedIndex: number;
+  readonly printedPage: string;
+  readonly structuralElementId: string;
+  readonly sourceSubject: SourceNativeSubjectCode;
+  readonly applicationSubjectCode: ApplicationSubjectCode;
+  readonly cellLabelAr: string;
+  readonly digitalState: ExpansionDigitalState;
+  readonly attributionMode: ExpansionCellAttributionMode;
+  readonly exactGradeEvidenceState: ExactGradeEvidenceState;
+  readonly notes: string;
+}
+
+/** Batch manifest — frozen declaration of one controlled batch (§9/§22). */
+export interface ControlledBatchManifest {
+  readonly gate: '07C.10';
+  readonly batchId: string;
+  readonly batchName: string;
+  readonly sourceSubject: BatchSourceSubject;
+  readonly applicationSubjectCode: ApplicationSubjectCode;
+  readonly structuralElementIds: readonly string[];
+  readonly extractionMethod: 'DIRECT_STRUCTURED_EXTRACTION';
+  readonly extractionClass: ArtifactOcrClassification; // DIRECT_DIGITAL for both frozen batches
+  /** Physical pages authorized for EXTRACTION (frozen; context pages excluded). */
+  readonly authorizedExtractionPages: readonly number[];
+  /** Physical pages that provide ATTRIBUTION CONTEXT ONLY — never extraction. */
+  readonly attributionContextPagesOnly: readonly number[];
+  readonly sourceVersionId: string;
+  readonly artifactSha256: string;
+  readonly maximumClaims: number;             // CEILING, not quota
+  readonly deathValue: string;                // why this exact batch scope
+  readonly declaredAt: string;                // static freeze date (ISO)
+  readonly status: 'FROZEN';
+}
+
+/** A negative (deferred/excluded/rejected) candidate for a batch. */
+export interface BatchNegativeCandidate {
+  readonly negativeId: string;
+  /** Set when tied to a specific frozen batch; omitted for gate-level rejections. */
+  readonly batchId?: string;
+  readonly negativeReason: string;
+  readonly negativeState: BatchNegativeState;
+  readonly neverBecomesClaim: boolean;        // MUST stay true
+}
+
+/** A single batch content claim bound to its cell + manifest. */
+export interface BatchContentClaim {
+  readonly claimId: string;
+  readonly batchId: string;
+  readonly cellId: string;
+  readonly category: ContentClaimCategory;
+  /** Math only; null for French (no matrix topic). */
+  readonly sourceTopic: GateSourceTopic | null;
+  readonly educationSystemCode: string;       // MOROCCO
+  readonly stageCode: string;                 // PRIMARY
+  /** DECLARED candidate grade; null when the artifact only establishes a band. */
+  readonly candidateGrade: CellSourceConfirmedGrade | null;
+  /** Artifact scope: single grade (['P3']) or honest grade band (['P1','P2','P3']). */
+  readonly gradeBandScope: readonly string[];
+  readonly sourceConfirmedGrade: CellSourceConfirmedGrade | null; // only when DIRECTLY_ESTABLISHED
+  readonly structuralElementId: string;
+  readonly sourceSubject: SourceNativeSubjectCode;
+  readonly applicationSubjectCode: ApplicationSubjectCode;
+  readonly sourceVersionId: string;
+  readonly sourceClassification: SourceClassification; // OFFICIAL_CURRICULUM_DOCUMENT
+  /** Arabic source wording (SRC_ARABIC/SRC_MATH claims). Exactly one of Ar/Fr. */
+  readonly sourceWordingAr?: string;
+  /** Normalized Arabic claim value (Arabic-medium claims). Exactly one of Ar/Fr. */
+  readonly normalizedValueAr?: string;
+  /** Authoritative French source wording for SRC_FRENCH claims (never a translation). */
+  readonly sourceWordingFr?: string;
+  /** Normalized French claim value; carries source truth for SRC_FRENCH claims. */
+  readonly normalizedValueFr?: string;
+  readonly normalizationClassification: NormalizationClassification;
+  readonly extractionMethod: ExtractionMethod;
+  readonly provenance: SourceContentClaimProvenance;
+  readonly attributionMode: ExpansionCellAttributionMode;
+  readonly exactGradeEvidenceState: ExactGradeEvidenceState;
+  readonly verificationState: VerificationState;
+  readonly contentStatus: ExtractionContentStatus;
+  readonly confidence: 'HIGH' | 'MODERATE' | 'LOW' | 'UNVERIFIED';
+  readonly notes?: string;
+}
+
+/** Which canonical scope a dedup comparison ran against. */
+export type BatchDedupAgainst =
+  | 'WITHIN_BATCH'
+  | 'OTHER_BATCH'
+  | 'GATE_07C.7'
+  | 'GATE_07C.9';
+
+/** Machine-readable record of a prevented duplicate (never a second claim). */
+export interface BatchDedupPreventionRecord {
+  readonly against: BatchDedupAgainst;
+  readonly preventedClaimCanonicalKey: string; // the semantic source scope that was refused
+  readonly retainedCanonicalKey: string;       // the already-existing canonical claim it would duplicate
+  readonly retainedClaimId: string;            // exact retained claim identity (e.g. clm-...)
+  readonly note: string;
+}
+
+/** Executed dedup comparison summary — derived, auditable (§G). */
+export interface BatchDedupCheckResult {
+  readonly comparisons: readonly {
+    readonly against: BatchDedupAgainst;
+    readonly comparedKeyCount: number;
+    readonly collisions: number;
+  }[];
+  readonly duplicatesPrevented: readonly BatchDedupPreventionRecord[];
+  readonly totalDuplicatesPrevented: number;
+  readonly twentySevenC7SuiteFrozen: boolean;  // 92/92 untouched
+  readonly sevenC7PilotFrozen: boolean;        // 16 claims untouched
+  readonly sevenC8ReviewsFrozen: boolean;      // 6 records untouched
+  readonly sevenC9ExpansionFrozen: boolean;    // 3 cells untouched
+}
+
+/** Per-batch ledger — every count DERIVED from the canonical records. */
+export interface ControlledBatchLedger {
+  readonly gate: '07C.10';
+  readonly batchId: string;
+  readonly manifest: ControlledBatchManifest;
+  readonly cells: readonly ControlledBatchCell[];
+  readonly cellCount: number;
+  readonly claims: readonly BatchContentClaim[];
+  readonly claimCount: number;
+  readonly maximumClaims: number;              // == manifest.maximumClaims (ceiling)
+  // Attribution-mode counts (derived).
+  readonly directlyEstablishedGradeCount: number;
+  readonly structurallyCalibratedGradeCount: number;
+  readonly reviewRequiredGradeCount: number;
+  readonly sourceStructureInsufficientGradeCount: number;
+  // State counts (derived).
+  readonly extractedUnverifiedCount: number;
+  readonly reviewRequiredContentCount: number;
+  // FROZEN safety counters (§Phase B): MUST stay 0.
+  readonly contentVerifiedCount: number;
+  readonly publishedCount: number;
+  readonly directSourceConfirmedCount: number; // 0 unless separately proven directly
+  readonly syntheticLessons: number;
+  readonly syntheticKnowledgeObjects: number;
+  readonly syntheticExercises: number;
+  readonly contentDenominatorKnown: boolean;
+  readonly completenessStatus: 'MEASURABLE' | 'UNMEASURABLE';
+  readonly lifecycleState: BatchLifecycleState;
+  readonly closedAt?: string;                  // ISO when BATCH_CLOSED
+  readonly dedup: BatchDedupCheckResult;
+}
+
+/** Global 07C.10 ledger — derived aggregates across the two batches. */
+export interface ControlledBatchGlobalLedger {
+  readonly gate: '07C.10';
+  readonly batchIds: readonly string[];
+  readonly batchCount: number;
+  readonly totalCellCount: number;
+  readonly totalClaimCount: number;
+  readonly totalMaximumClaims: number;
+  readonly claimsBySourceSubject: readonly { sourceSubject: SourceNativeSubjectCode; count: number }[];
+  readonly claimsByGradeEvidenceState: readonly { exactGradeEvidenceState: ExactGradeEvidenceState; count: number }[];
+  readonly claimsByContentStatus: readonly { contentStatus: ExtractionContentStatus; count: number }[];
+  readonly claimsByVerificationState: readonly { verificationState: VerificationState; count: number }[];
+  readonly duplicateClaimsPreventedTotal: number;
+  readonly negativeCandidateCount: number;
+  readonly contentVerifiedCount: number;       // MUST stay 0 (§3)
+  readonly publishedCount: number;             // MUST stay 0 (§3)
+  readonly completenessStatus: 'MEASURABLE' | 'UNMEASURABLE';
+  readonly contentDenominatorKnown: boolean;   // false
+  readonly allBatchesClosed: boolean;          // true only when both are BATCH_CLOSED
+}
+
+/** Overall Gate 07C.10 verdict. */
+export interface ControlledBatchExtractionVerdict {
+  readonly gate: '07C.10';
+  readonly artifactSha256: string;
+  readonly sourceVersionId: string;
+  readonly batchIds: readonly string[];
+  readonly batchCount: number;
+  readonly cellCount: number;
+  readonly claimCount: number;
+  readonly contentVerified: number;            // 0
+  readonly published: number;                  // 0
+  readonly structureCompleteVerified: number;  // 0
+  readonly masteryDerived: boolean;            // false
+  readonly contentDenominatorKnown: boolean;   // false
+  readonly completenessUnmeasurable: boolean;  // true
+  readonly sourceNativeFirst: boolean;         // true
+  readonly applicationMappingIsSecondary: boolean; // true
+  readonly noSyntheticUnitsLessonsKOsOrExercises: boolean; // true
+  readonly noFabricatedGradeOwnership: boolean;// true (Batch B stays REVIEW_REQUIRED)
+  readonly noSourceTruthDuplication: boolean;  // true (dedup executed, 0 duplicates created)
+  readonly lifecycleProven: boolean;           // both batches reached BATCH_CLOSED
+  readonly closureSemantics: boolean;          // BATCH_CLOSED != VERIFIED != PUBLISHED
+  readonly pilotRegistryFrozen: boolean;       // true (07C.7 16 claims untouched)
+  readonly reviewRegistryFrozen: boolean;      // true (07C.8 6 records untouched)
+  readonly expansionRegistryFrozen: boolean;   // true (07C.9 3 cells untouched)
+  readonly denominatorFrozenVerbatim: boolean; // true (global freezes preserved)
+  readonly recommendation: 'PASS' | 'PARTIAL' | 'FAIL';
+}
